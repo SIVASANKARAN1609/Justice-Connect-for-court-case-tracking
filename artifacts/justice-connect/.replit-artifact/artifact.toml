@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Justice Connect"
+description = "A civic-tech academic prototype that helps citizens understand case information, organize documents, find sample legal help, and navigate justice-related information with role-based citizen, lawyer, and admin dashboards."
+version = "1.0.0"
+id = "artifacts/justice-connect"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20833
+
+[services.development]
+run = "pnpm --filter @workspace/justice-connect run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/justice-connect", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/justice-connect/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20833"
+BASE_PATH = "/"

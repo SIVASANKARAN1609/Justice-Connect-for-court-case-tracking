@@ -1,15 +1,24 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Justice Connect academic prototype API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: dashboard
+  - name: users
+  - name: cases
+  - name: hearings
+  - name: documents
+  - name: lawyers
+  - name: questions
+  - name: complaints
+  - name: awareness
+  - name: notifications
 paths:
   /healthz:
     get:
@@ -24,7 +33,654 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a citizen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Sign in as a citizen, lawyer, or admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      security: [{ bearerAuth: [] }]
+      summary: Get the signed-in user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      security: [{ bearerAuth: [] }]
+      summary: Get a role-aware dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      security: [{ bearerAuth: [] }]
+      summary: List users for admin management
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManagedUser"
+  /users/{id}:
+    put:
+      operationId: updateUser
+      tags: [users]
+      security: [{ bearerAuth: [] }]
+      summary: Activate or deactivate a user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedUser"
+  /cases:
+    get:
+      operationId: listCases
+      tags: [cases]
+      security: [{ bearerAuth: [] }]
+      summary: List visible cases
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - name: monitoringStatus
+          in: query
+          schema:
+            $ref: "#/components/schemas/MonitoringStatus"
+      responses:
+        "200":
+          description: Cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+    post:
+      operationId: createCase
+      tags: [cases]
+      security: [{ bearerAuth: [] }]
+      summary: Add a sample case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseInput"
+      responses:
+        "201":
+          description: Created case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+  /cases/{id}:
+    get:
+      operationId: getCase
+      tags: [cases]
+      security: [{ bearerAuth: [] }]
+      summary: Get a case with hearings and documents
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Case detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateCase
+      tags: [cases]
+      security: [{ bearerAuth: [] }]
+      summary: Update a case
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseUpdate"
+      responses:
+        "200":
+          description: Updated case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+  /cases/{id}/hearings:
+    get:
+      operationId: listHearings
+      tags: [hearings]
+      security: [{ bearerAuth: [] }]
+      summary: List hearings for a case
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Hearings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Hearing"
+    post:
+      operationId: createHearing
+      tags: [hearings]
+      security: [{ bearerAuth: [] }]
+      summary: Add a hearing
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HearingInput"
+      responses:
+        "201":
+          description: Created hearing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hearing"
+  /hearings/{id}:
+    put:
+      operationId: updateHearing
+      tags: [hearings]
+      security: [{ bearerAuth: [] }]
+      summary: Update a hearing
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HearingUpdate"
+      responses:
+        "200":
+          description: Updated hearing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hearing"
+  /cases/{id}/documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      security: [{ bearerAuth: [] }]
+      summary: List documents for a case
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+  /documents:
+    post:
+      operationId: createDocument
+      tags: [documents]
+      security: [{ bearerAuth: [] }]
+      summary: Add a document record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentInput"
+      responses:
+        "201":
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+  /lawyers:
+    get:
+      operationId: listLawyers
+      tags: [lawyers]
+      security: [{ bearerAuth: [] }]
+      summary: Search sample lawyers
+      parameters:
+        - name: location
+          in: query
+          schema: { type: string }
+        - name: language
+          in: query
+          schema: { type: string }
+        - name: specialization
+          in: query
+          schema: { type: string }
+        - name: availability
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lawyers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lawyer"
+    post:
+      operationId: createLawyer
+      tags: [lawyers]
+      security: [{ bearerAuth: [] }]
+      summary: Add a sample lawyer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LawyerInput"
+      responses:
+        "201":
+          description: Created lawyer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lawyer"
+  /lawyers/{id}:
+    get:
+      operationId: getLawyer
+      tags: [lawyers]
+      security: [{ bearerAuth: [] }]
+      summary: Get a lawyer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Lawyer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lawyer"
+    put:
+      operationId: updateLawyer
+      tags: [lawyers]
+      security: [{ bearerAuth: [] }]
+      summary: Update a lawyer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LawyerUpdate"
+      responses:
+        "200":
+          description: Updated lawyer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lawyer"
+  /lawyers/{id}/verify:
+    post:
+      operationId: verifyLawyer
+      tags: [lawyers]
+      security: [{ bearerAuth: [] }]
+      summary: Verify a fictional sample lawyer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationInput"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationResult"
+  /questions:
+    get:
+      operationId: listQuestions
+      tags: [questions]
+      security: [{ bearerAuth: [] }]
+      summary: List visible legal questions
+      responses:
+        "200":
+          description: Questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LegalQuestion"
+    post:
+      operationId: createQuestion
+      tags: [questions]
+      security: [{ bearerAuth: [] }]
+      summary: Ask a sample lawyer a question
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Created question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalQuestion"
+  /questions/{id}:
+    get:
+      operationId: getQuestion
+      tags: [questions]
+      security: [{ bearerAuth: [] }]
+      summary: Get a question
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalQuestion"
+  /questions/{id}/respond:
+    post:
+      operationId: respondToQuestion
+      tags: [questions]
+      security: [{ bearerAuth: [] }]
+      summary: Respond to a citizen question
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponseInput"
+      responses:
+        "200":
+          description: Updated question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalQuestion"
+  /complaints:
+    get:
+      operationId: listComplaints
+      tags: [complaints]
+      security: [{ bearerAuth: [] }]
+      summary: List visible complaints
+      responses:
+        "200":
+          description: Complaints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Complaint"
+    post:
+      operationId: createComplaint
+      tags: [complaints]
+      security: [{ bearerAuth: [] }]
+      summary: Create a prototype complaint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplaintInput"
+      responses:
+        "201":
+          description: Created complaint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Complaint"
+  /complaints/{id}:
+    put:
+      operationId: updateComplaint
+      tags: [complaints]
+      security: [{ bearerAuth: [] }]
+      summary: Update complaint status and guidance
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplaintUpdate"
+      responses:
+        "200":
+          description: Updated complaint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Complaint"
+  /awareness:
+    get:
+      operationId: listAwareness
+      tags: [awareness]
+      security: [{ bearerAuth: [] }]
+      summary: List awareness articles
+      responses:
+        "200":
+          description: Awareness articles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AwarenessArticle"
+    post:
+      operationId: createAwareness
+      tags: [awareness]
+      security: [{ bearerAuth: [] }]
+      summary: Add an awareness article
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AwarenessInput"
+      responses:
+        "201":
+          description: Created article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AwarenessArticle"
+  /awareness/{id}:
+    get:
+      operationId: getAwareness
+      tags: [awareness]
+      security: [{ bearerAuth: [] }]
+      summary: Get an awareness article
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Awareness article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AwarenessArticle"
+    put:
+      operationId: updateAwareness
+      tags: [awareness]
+      security: [{ bearerAuth: [] }]
+      summary: Update an awareness article
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AwarenessUpdate"
+      responses:
+        "200":
+          description: Updated article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AwarenessArticle"
+    delete:
+      operationId: deleteAwareness
+      tags: [awareness]
+      security: [{ bearerAuth: [] }]
+      summary: Delete an awareness article
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      security: [{ bearerAuth: [] }]
+      summary: List notifications for the signed-in user
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+  /notifications/{id}/read:
+    put:
+      operationId: markNotificationRead
+      tags: [notifications]
+      security: [{ bearerAuth: [] }]
+      summary: Mark a notification read
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +689,292 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    User:
+      type: object
+      required: [id, name, email, role, language]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        role:
+          type: string
+          enum: [citizen, lawyer, admin]
+        language: { type: string, enum: [English, Tamil] }
+        lawyerId: { type: ["string", "null"] }
+    ManagedUser:
+      type: object
+      required: [id, name, email, role, language, active, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string }
+        language: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string }
+    UserUpdate:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
+    RegisterInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        language: { type: string, enum: [English, Tamil], default: English }
+    LoginInput:
+      type: object
+      required: [identifier, password]
+      properties:
+        identifier: { type: string, minLength: 1 }
+        password: { type: string, minLength: 8 }
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user: { $ref: "#/components/schemas/User" }
+    DashboardSummary:
+      type: object
+      required: [role, activeCases, upcomingHearings, pendingQuestions, notifications, complaints]
+      properties:
+        role: { type: string }
+        activeCases: { type: integer }
+        upcomingHearings: { type: integer }
+        pendingQuestions: { type: integer }
+        notifications: { type: integer }
+        complaints: { type: integer }
+        verifiedLawyers: { type: integer }
+        totalCitizens: { type: integer }
+        totalLawyers: { type: integer }
+    MonitoringStatus:
+      type: string
+      enum: [Normal Monitoring, Needs Attention, Long-Pending]
+    Case:
+      type: object
+      required: [id, caseNumber, title, court, location, filingDate, currentStatus, monitoringStatus, caseAge, nextHearing]
+      properties:
+        id: { type: integer }
+        caseNumber: { type: string }
+        title: { type: string }
+        citizenName: { type: ["string", "null"] }
+        lawyerName: { type: ["string", "null"] }
+        court: { type: string }
+        location: { type: string }
+        filingDate: { type: string }
+        currentStatus: { type: string }
+        monitoringStatus: { $ref: "#/components/schemas/MonitoringStatus" }
+        caseAge: { type: string }
+        nextHearing: { type: ["string", "null"] }
+    CaseDetail:
+      allOf:
+        - $ref: "#/components/schemas/Case"
+        - type: object
+          required: [hearings, documents]
+          properties:
+            hearings:
+              type: array
+              items: { $ref: "#/components/schemas/Hearing" }
+            documents:
+              type: array
+              items: { $ref: "#/components/schemas/Document" }
+    CaseInput:
+      type: object
+      required: [caseNumber, title, court, location, filingDate, currentStatus, monitoringStatus]
+      properties:
+        caseNumber: { type: string }
+        title: { type: string }
+        citizenId: { type: integer }
+        lawyerId: { type: ["integer", "null"] }
+        court: { type: string }
+        location: { type: string }
+        filingDate: { type: string }
+        currentStatus: { type: string }
+        monitoringStatus: { $ref: "#/components/schemas/MonitoringStatus" }
+    CaseUpdate:
+      type: object
+      properties:
+        currentStatus: { type: string }
+        monitoringStatus: { $ref: "#/components/schemas/MonitoringStatus" }
+        lawyerId: { type: ["integer", "null"] }
+    Hearing:
+      type: object
+      required: [id, caseId, hearingDate, time, stage, result]
+      properties:
+        id: { type: integer }
+        caseId: { type: integer }
+        hearingDate: { type: string }
+        time: { type: string }
+        stage: { type: string }
+        court: { type: string }
+        location: { type: string }
+        result: { type: string }
+        adjournmentReason: { type: ["string", "null"] }
+    HearingInput:
+      type: object
+      required: [hearingDate, time, stage, result]
+      properties:
+        hearingDate: { type: string }
+        time: { type: string }
+        stage: { type: string }
+        result: { type: string }
+        adjournmentReason: { type: ["string", "null"] }
+    HearingUpdate:
+      allOf:
+        - $ref: "#/components/schemas/HearingInput"
+    Document:
+      type: object
+      required: [id, caseId, fileName, fileType, uploadedAt]
+      properties:
+        id: { type: integer }
+        caseId: { type: integer }
+        fileName: { type: string }
+        fileType: { type: string }
+        uploadedAt: { type: string }
+        explanation: { type: ["string", "null"] }
+    DocumentInput:
+      type: object
+      required: [caseId, fileName, fileType]
+      properties:
+        caseId: { type: integer }
+        fileName: { type: string }
+        fileType: { type: string }
+        explanation: { type: string }
+    Lawyer:
+      type: object
+      required: [id, lawyerId, name, specialization, location, languages, experience, availability, verificationStatus, isSample]
+      properties:
+        id: { type: integer }
+        lawyerId: { type: string }
+        name: { type: string }
+        email: { type: ["string", "null"] }
+        specialization: { type: string }
+        location: { type: string }
+        languages:
+          type: array
+          items: { type: string }
+        experience: { type: integer }
+        availability: { type: string }
+        verificationStatus: { type: string, enum: [Verified Sample Lawyer, Verification Required, Rejected, Suspended] }
+        isSample: { type: boolean }
+    LawyerInput:
+      type: object
+      required: [name, specialization, location, languages, experience, availability]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        specialization: { type: string }
+        location: { type: string }
+        languages:
+          type: array
+          items: { type: string }
+        experience: { type: integer, minimum: 0 }
+        availability: { type: string }
+    LawyerUpdate:
+      allOf:
+        - $ref: "#/components/schemas/LawyerInput"
+    VerificationInput:
+      type: object
+      required: [sampleRegistrationNumber]
+      properties:
+        sampleRegistrationNumber: { type: string }
+    VerificationResult:
+      type: object
+      required: [verified, message]
+      properties:
+        verified: { type: boolean }
+        message: { type: string }
+        lawyer: { $ref: "#/components/schemas/Lawyer" }
+    LegalQuestion:
+      type: object
+      required: [id, category, question, status, createdAt]
+      properties:
+        id: { type: integer }
+        citizenName: { type: ["string", "null"] }
+        lawyerName: { type: ["string", "null"] }
+        category: { type: string }
+        question: { type: string }
+        attachmentName: { type: ["string", "null"] }
+        status: { type: string, enum: [Pending, Answered] }
+        response: { type: ["string", "null"] }
+        createdAt: { type: string }
+    QuestionInput:
+      type: object
+      required: [category, lawyerId, question]
+      properties:
+        category: { type: string }
+        lawyerId: { type: integer }
+        question: { type: string, minLength: 10 }
+        attachmentName: { type: ["string", "null"] }
+    ResponseInput:
+      type: object
+      required: [response]
+      properties:
+        response: { type: string, minLength: 10 }
+    Complaint:
+      type: object
+      required: [id, category, description, location, status, guidance, createdAt]
+      properties:
+        id: { type: integer }
+        category: { type: string }
+        description: { type: string }
+        location: { type: string }
+        status: { type: string, enum: [Submitted, Under Review, Guidance Provided, Closed] }
+        guidance: { type: string }
+        createdAt: { type: string }
+    ComplaintInput:
+      type: object
+      required: [category, description, location]
+      properties:
+        category: { type: string }
+        description: { type: string, minLength: 10 }
+        location: { type: string }
+        attachmentName: { type: ["string", "null"] }
+    ComplaintUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [Submitted, Under Review, Guidance Provided, Closed] }
+        guidance: { type: string }
+    AwarenessArticle:
+      type: object
+      required: [id, title, category, summary, content, language, published]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category: { type: string }
+        summary: { type: string }
+        content: { type: string }
+        language: { type: string, enum: [English, Tamil] }
+        published: { type: boolean }
+    AwarenessInput:
+      type: object
+      required: [title, category, summary, content, language]
+      properties:
+        title: { type: string }
+        category: { type: string }
+        summary: { type: string }
+        content: { type: string }
+        language: { type: string, enum: [English, Tamil] }
+        published: { type: boolean }
+    AwarenessUpdate:
+      allOf:
+        - $ref: "#/components/schemas/AwarenessInput"
+    Notification:
+      type: object
+      required: [id, title, message, type, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        message: { type: string }
+        type: { type: string }
+        isRead: { type: boolean }
+        createdAt: { type: string }
 
