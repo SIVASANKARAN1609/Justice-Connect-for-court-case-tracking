@@ -37,7 +37,7 @@ paths:
     post:
       operationId: register
       tags: [auth]
-      summary: Register a citizen
+      summary: Register a citizen or lawyer
       requestBody:
         required: true
         content:
@@ -729,6 +729,7 @@ components:
         name: { type: string, minLength: 2 }
         email: { type: string, format: email }
         password: { type: string, minLength: 8 }
+        role: { type: string, enum: [citizen, lawyer], default: citizen }
         language: { type: string, enum: [English, Tamil], default: English }
     LoginInput:
       type: object

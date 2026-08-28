@@ -98,6 +98,7 @@ import {
 import { requireAuth, requireRole, createToken } from "../middlewares/auth";
 
 const router: IRouter = Router();
+const ADMIN_LOGIN_ID = "JC-ADMIN-001";
 
 const nowIso = (value: Date | string | null | undefined) =>
   value instanceof Date ? value.toISOString() : value ?? null;
@@ -225,11 +226,29 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     name: parsed.data.name,
     email: parsed.data.email.toLowerCase(),
     passwordHash: await bcrypt.hash(parsed.data.password, 10),
-    role: "citizen",
+    role: parsed.data.role,
     language: parsed.data.language ?? "English",
   }).returning();
-  const authUser = { id: user.id, name: user.name, email: user.email, role: "citizen" as const };
-  res.status(201).json(RegisterResponse.parse({ token: createToken(authUser), user: publicUser(user) }));
+  let lawyerId: string | null = null;
+  if (parsed.data.role === "lawyer") {
+    lawyerId = `JC-LAW-${String(user.id).padStart(4, "0")}`;
+    await db.insert(lawyersTable).values({
+      lawyerId,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      sampleRegistrationNumber: `PENDING-${user.id}`,
+      specialization: "General Practice",
+      location: "To be added",
+      languages: [user.language],
+      experience: 0,
+      availability: "Available",
+      verificationStatus: "Verification Required",
+      isSample: false,
+    });
+  }
+  const authUser = { id: user.id, name: user.name, email: user.email, role: parsed.data.role };
+  res.status(201).json(RegisterResponse.parse({ token: createToken(authUser), user: publicUser(user, lawyerId) }));
 });
 
 router.post("/auth/login", async (req, res): Promise<void> => {
@@ -239,10 +258,14 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
   const identifier = parsed.data.identifier.trim();
+  const identifierMatches = [ilike(usersTable.email, identifier), eq(lawyersTable.lawyerId, identifier)];
+  if (identifier.toUpperCase() === ADMIN_LOGIN_ID) {
+    identifierMatches.push(eq(usersTable.role, "admin"));
+  }
   const [row] = await db.select({ user: usersTable, lawyerId: lawyersTable.lawyerId })
     .from(usersTable)
     .leftJoin(lawyersTable, eq(lawyersTable.userId, usersTable.id))
-    .where(or(ilike(usersTable.email, identifier), eq(lawyersTable.lawyerId, identifier)));
+    .where(or(...identifierMatches));
   if (!row || !row.user.active || !(await bcrypt.compare(parsed.data.password, row.user.passwordHash))) {
     res.status(401).json({ error: "Invalid demo account details" });
     return;

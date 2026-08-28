@@ -48,6 +48,7 @@ export * from './notification';
 export * from './questionInput';
 export * from './registerInput';
 export * from './registerInputLanguage';
+export * from './registerInputRole';
 export * from './responseInput';
 export * from './searchParameter';
 export * from './unauthorizedResponse';

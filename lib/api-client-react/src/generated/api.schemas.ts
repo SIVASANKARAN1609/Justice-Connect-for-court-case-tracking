@@ -54,6 +54,14 @@ export interface UserUpdate {
   active: boolean;
 }
 
+export type RegisterInputRole = typeof RegisterInputRole[keyof typeof RegisterInputRole];
+
+
+export const RegisterInputRole = {
+  citizen: 'citizen',
+  lawyer: 'lawyer',
+} as const;
+
 export type RegisterInputLanguage = typeof RegisterInputLanguage[keyof typeof RegisterInputLanguage];
 
 
@@ -68,6 +76,7 @@ export interface RegisterInput {
   email: string;
   /** @minLength 8 */
   password: string;
+  role?: RegisterInputRole;
   language?: RegisterInputLanguage;
 }
 

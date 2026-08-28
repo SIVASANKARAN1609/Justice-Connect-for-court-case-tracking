@@ -18,18 +18,20 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary Register a citizen
+ * @summary Register a citizen or lawyer
  */
 export const registerBodyNameMin = 2;
 
 export const registerBodyPasswordMin = 8;
 
+export const registerBodyRoleDefault = `citizen`;
 export const registerBodyLanguageDefault = `English`;
 
 export const RegisterBody = zod.object({
   "name": zod.string().min(registerBodyNameMin),
   "email": zod.email(),
   "password": zod.string().min(registerBodyPasswordMin),
+  "role": zod.enum(['citizen', 'lawyer']).default(registerBodyRoleDefault),
   "language": zod.enum(['English', 'Tamil']).default(registerBodyLanguageDefault)
 })
 
