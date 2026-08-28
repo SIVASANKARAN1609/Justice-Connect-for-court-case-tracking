@@ -484,7 +484,9 @@ export const UpdateLawyerBody = zod.object({
   "languages": zod.array(zod.string()),
   "experience": zod.int().min(updateLawyerBodyOneExperienceMin),
   "availability": zod.string()
-})
+}).and(zod.object({
+  "verificationStatus": zod.enum(['Verified Sample Lawyer', 'Verification Required', 'Rejected', 'Suspended']).optional()
+}))
 
 export const UpdateLawyerResponse = zod.object({
   "id": zod.int(),

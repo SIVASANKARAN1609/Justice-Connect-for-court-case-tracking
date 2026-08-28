@@ -6,5 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LawyerInput } from './lawyerInput';
+import type { LawyerUpdateVerificationStatus } from './lawyerUpdateVerificationStatus';
 
-export type LawyerUpdate = LawyerInput;
+export type LawyerUpdate = LawyerInput & {
+  verificationStatus?: LawyerUpdateVerificationStatus;
+};

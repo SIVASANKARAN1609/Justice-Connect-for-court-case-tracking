@@ -1,0 +1,1369 @@
+# Build Justice Connect — Full-Stack Academic/Demo Prototype
+
+Build a complete, responsive full-stack web application called **Justice Connect**.
+
+### Tagline
+
+**Understand. Navigate. Get Help.**
+
+This is a **college academic/demo prototype**, not a real legal service. Use **fictional SAMPLE DATA only**. Do not connect to real court databases, real government APIs, or real lawyer verification systems.
+
+The main product idea is:
+
+> **One simple place to understand, organize, and navigate justice-related information.**
+
+Do NOT make the product feel like an AI lawyer or legal-advice chatbot.
+
+---
+
+# 1. IMPORTANT SIMPLICITY RULES
+
+Keep the project **moderate and easy to demonstrate**.
+
+Do NOT over-engineer it.
+
+### Authentication must be very simple:
+
+**Citizen**
+
+* Email
+* Password
+* Minimum 8 characters
+* Sign In
+* Sign Up
+
+**Lawyer**
+
+* Lawyer ID or Email
+* Password
+* Minimum 8 characters
+* Sign In
+
+**Admin**
+
+* Admin Email
+* Password
+* Minimum 8 characters
+* Sign In
+
+### Completely remove:
+
+* OTP
+* Phone verification
+* Email verification
+* Google login
+* Social login
+* Multi-factor authentication
+* Complicated password rules
+* Multi-step authentication
+* Real identity verification
+
+Use simple project-level authentication with hashed passwords and sessions/JWT.
+
+---
+
+# 2. TECH STACK
+
+Use a moderate full-stack architecture:
+
+### Frontend
+
+* React
+* TypeScript
+* Tailwind CSS
+* React Router
+* Responsive desktop/mobile UI
+
+### Backend
+
+* Node.js
+* Express.js
+* REST APIs
+* JWT authentication
+* bcrypt password hashing
+
+### Database
+
+* PostgreSQL
+
+Do not add unnecessary microservices, Redis, Docker orchestration, message queues, or complicated infrastructure.
+
+---
+
+# 3. THREE DASHBOARDS ONLY
+
+The application has exactly three main role dashboards:
+
+### 👤 Citizen Dashboard
+
+For common people.
+
+### ⚖️ Lawyer Dashboard
+
+For approved/verified sample lawyers.
+
+### 🛠️ Admin Dashboard
+
+For platform management and lawyer verification.
+
+Do NOT create a separate Authority dashboard.
+
+---
+
+# 4. LANDING PAGE
+
+Create a professional landing page.
+
+Include:
+
+**Justice Connect**
+
+**Understand. Navigate. Get Help.**
+
+Short description:
+
+> A simple digital platform to help people understand case information, organize documents, find legal help, and navigate justice-related information.
+
+Buttons:
+
+* Get Started
+* Sign In
+
+Role explanation:
+
+* Citizen
+* Lawyer
+* Admin
+
+Clearly display:
+
+> **SAMPLE DATA – ACADEMIC PROTOTYPE**
+
+Also include:
+
+> This project is a college demonstration prototype. It does not provide legal advice or connect to real court/government systems.
+
+---
+
+# 5. CITIZEN AUTHENTICATION
+
+Create simple Sign In and Sign Up pages.
+
+### Sign In
+
+Fields:
+
+* Email
+* Password
+
+Buttons:
+
+* Sign In
+* Create Account
+
+### Sign Up
+
+Fields:
+
+* Name
+* Email
+* Password
+
+Password rule:
+
+> Minimum 8 characters
+
+After successful registration, take the user directly to the Citizen Dashboard.
+
+No OTP or verification screen.
+
+---
+
+# 6. CITIZEN DASHBOARD
+
+Create a clean dashboard with:
+
+* Welcome message
+* Active Case
+* Next Hearing
+* Case Status
+* Case Age
+* Notifications
+* Quick Actions
+
+Quick actions:
+
+* Search Case
+* My Cases
+* Documents
+* Find a Lawyer
+* Ask a Lawyer
+* Raise Your Voice
+* Legal Awareness
+
+Use realistic fictional sample data.
+
+---
+
+# 7. CASE MANAGEMENT
+
+Citizen can search using a sample case number.
+
+Example:
+
+`JC-CIV-2026-001`
+
+Create:
+
+### Case Search
+
+Input:
+
+> Enter Case Number
+
+Button:
+
+> Search Case
+
+Display:
+
+* Case number
+* Case title
+* Court
+* Location
+* Filing date
+* Current status
+* Case age
+* Monitoring status
+* Next hearing
+
+### Monitoring status
+
+Use:
+
+* 🟢 Normal Monitoring
+* 🟠 Needs Attention
+* 🔴 Long-Pending
+
+Do NOT promise that a case will finish within two years.
+
+For long-pending cases display:
+
+> This case has been pending for an extended period. Consider monitoring the latest hearing information and seeking appropriate official/legal assistance.
+
+---
+
+# 8. CASE TIMELINE
+
+Create a visual timeline.
+
+Example:
+
+```text
+Case Filed
+   ↓
+Initial Hearing
+   ↓
+Document Submission
+   ↓
+Previous Hearing
+   ↓
+Adjournment
+   ↓
+Current Stage
+   ↓
+Next Hearing
+```
+
+For each hearing show:
+
+* Date
+* Stage
+* Court
+* Result/status
+* Adjournment reason if applicable
+
+---
+
+# 9. NEXT HEARING
+
+Clearly display:
+
+* Hearing date
+* Time
+* Court
+* Location
+* Current stage
+
+Add:
+
+### Reminder
+
+Button:
+
+> Set Reminder
+
+For the prototype, simply show a success message.
+
+Also include:
+
+> **Travel Planning Note**
+
+Example:
+
+> Plan your travel in advance and arrive at the court location before the scheduled time.
+
+Do not connect to real maps or notification services.
+
+---
+
+# 10. DOCUMENT MANAGEMENT
+
+Citizen can:
+
+* Upload sample PDF/image
+* View documents
+* See document name
+* See document type
+* See upload date
+* Associate document with a case
+
+Use simple local/file storage or prototype upload handling.
+
+Do not build complicated document processing infrastructure.
+
+---
+
+# 11. AI-STYLE DOCUMENT EXPLAINER
+
+Create a page called:
+
+**Document Explainer**
+
+User selects/uploads a sample document.
+
+Display:
+
+### Simple Explanation
+
+Explain the document using predefined sample data.
+
+### Important Dates
+
+Example:
+
+* Hearing Date
+* Filing Date
+* Response Date
+
+### Important Terms
+
+Example:
+
+* Summons
+* Respondent
+* Hearing
+* Adjournment
+
+### Key Points
+
+Show 3–5 simple bullet points.
+
+Use a predefined/mock AI response for the academic prototype.
+
+Do NOT require an external paid AI API.
+
+Clearly display:
+
+> ⚠️ This explanation is for demonstration purposes only and is not legal advice.
+
+---
+
+# 12. FIND A LAWYER
+
+Create a major **Get Legal Help** section.
+
+Citizen can search sample lawyers.
+
+Filters:
+
+* Location
+* Language
+* Specialization
+* Experience
+* Availability
+
+Example lawyer card:
+
+**Arun Kumar**
+
+* Lawyer ID: `JC-LAW-1001`
+* Civil Law
+* Chennai
+* Tamil, English
+* 6 years experience
+* Available
+
+Show a clear badge:
+
+> ✓ VERIFIED SAMPLE LAWYER
+
+And:
+
+> Prototype verification based on fictional sample data.
+
+Never claim that the lawyer is actually verified in the real world.
+
+---
+
+# 13. UNIQUE LAWYER ACCOUNT SYSTEM
+
+Lawyers must not freely register themselves as verified lawyers.
+
+The Admin creates/adds lawyer accounts.
+
+Each lawyer receives a unique Lawyer ID.
+
+Examples:
+
+```text
+JC-LAW-1001
+JC-LAW-1002
+JC-LAW-1003
+JC-LAW-1004
+```
+
+Lawyer login can use:
+
+* Lawyer ID + Password
+
+or
+
+* Email + Password
+
+The Admin controls:
+
+* Lawyer creation
+* Lawyer approval
+* Lawyer verification
+* Lawyer suspension
+
+---
+
+# 14. SAMPLE LAWYER VERIFICATION
+
+Create a simple verification workflow.
+
+Admin can enter sample information:
+
+* Lawyer name
+* Lawyer ID
+* Sample registration number
+* Specialization
+* Location
+* Languages
+* Experience
+
+The backend checks the predefined fictional sample lawyer records.
+
+If matching:
+
+> ✓ VERIFIED SAMPLE LAWYER
+
+If not:
+
+> Verification Required
+
+Important disclaimer:
+
+> This verification uses fictional sample data created for the academic prototype. It does not confirm real-world professional credentials.
+
+---
+
+# 15. ASK A LAWYER
+
+Citizen can ask a general legal question.
+
+Page:
+
+**Ask a Lawyer**
+
+Fields:
+
+* Select category
+* Select lawyer
+* Question
+* Optional document attachment
+
+Categories:
+
+* Civil
+* Criminal
+* Family
+* Consumer
+* Property
+* Employment
+* General
+
+Button:
+
+> Submit Question
+
+After submission:
+
+> Your question has been sent to the sample lawyer.
+
+Show status:
+
+* Pending
+* Answered
+
+---
+
+# 16. LAWYER RESPONSE
+
+On the Lawyer Dashboard create:
+
+### Questions
+
+Show:
+
+* Question ID
+* Citizen
+* Category
+* Question
+* Date
+* Status
+
+Lawyer can open a question and provide a response.
+
+Button:
+
+> Submit Response
+
+Citizen can then see the response.
+
+Clearly label the entire workflow:
+
+> **ACADEMIC PROTOTYPE — SAMPLE LAWYER COMMUNICATION**
+
+Do not claim that an actual lawyer has responded unless the account is an actual project user.
+
+---
+
+# 17. LAWYER DASHBOARD
+
+Create a professional but simple dashboard.
+
+Show:
+
+* Welcome message
+* Lawyer ID
+* Verification badge
+* Assigned Cases
+* Upcoming Hearings
+* Pending Questions
+* Answered Questions
+
+Navigation:
+
+* Dashboard
+* My Cases
+* Hearings
+* Documents
+* Ask a Lawyer Questions
+* Profile
+
+Lawyer can:
+
+* View assigned sample cases
+* View client information
+* View hearings
+* View case documents
+* Answer citizen questions
+* Update basic profile
+
+---
+
+# 18. RAISE YOUR VOICE
+
+Create a complaint/grievance guidance module.
+
+Citizen enters:
+
+* Problem description
+* Category
+* Location
+* Optional document
+
+Categories:
+
+* Consumer
+* Public Service
+* Employment
+* Property
+* Education
+* Other
+
+After submission, show:
+
+### Suggested Category
+
+Example:
+
+> Consumer Complaint
+
+### General Next Steps
+
+1. Collect relevant documents.
+2. Keep records of communication.
+3. Identify the appropriate authority.
+4. Consider seeking qualified legal assistance.
+
+Create a prototype complaint status:
+
+* Submitted
+* Under Review
+* Guidance Provided
+* Closed
+
+IMPORTANT:
+
+Do NOT automatically submit complaints to real authorities.
+
+Show:
+
+> This prototype does not submit complaints to government authorities.
+
+---
+
+# 19. LEGAL AWARENESS
+
+Create a **Know Your Rights** section.
+
+Include sample articles/cards:
+
+* What is a Court Summons?
+* Understanding Case Status
+* What is an Adjournment?
+* Preparing for a Hearing
+* Basic Consumer Rights
+* Understanding Legal Documents
+* How to Find Legal Help
+
+Each article should have:
+
+* Title
+* Category
+* Short summary
+* Read More
+* Simple explanation
+
+Use fictional/sample educational content.
+
+---
+
+# 20. LANGUAGE & ACCESSIBILITY
+
+Add:
+
+* English
+* Tamil
+
+Create a language switcher.
+
+The UI should support:
+
+* Large readable text
+* Clear buttons
+* Good spacing
+* High readability
+* Simple navigation
+* Mobile-friendly layout
+
+Add a simple voice interaction demo:
+
+> 🎤 Voice Assistance
+
+It can use browser speech recognition if easy to implement.
+
+If unavailable, show a prototype/demo state.
+
+Do not build complicated voice AI infrastructure.
+
+---
+
+# 21. NOTIFICATIONS
+
+Create simple notifications.
+
+Examples:
+
+* Upcoming hearing
+* Lawyer response
+* Case status update
+* Complaint update
+
+Use sample notifications.
+
+No SMS/email notification service is required.
+
+---
+
+# 22. ADMIN DASHBOARD
+
+Create the third dashboard:
+
+### Admin Dashboard
+
+Display:
+
+* Total Citizens
+* Total Lawyers
+* Verified Lawyers
+* Total Cases
+* Pending Questions
+* Complaints
+
+Use simple charts/cards.
+
+Navigation:
+
+* Dashboard
+* Users
+* Lawyers
+* Cases
+* Complaints
+* Awareness
+* Updates
+
+---
+
+# 23. ADMIN — USER MANAGEMENT
+
+Admin can:
+
+* View citizens
+* View lawyers
+* Search users
+* View account details
+* Activate/deactivate users
+
+Keep it simple.
+
+---
+
+# 24. ADMIN — LAWYER MANAGEMENT
+
+This is one of the most important admin modules.
+
+Admin can:
+
+* Add lawyer
+* Generate unique Lawyer ID
+* Edit lawyer
+* View lawyer
+* Verify sample lawyer
+* Reject verification
+* Suspend lawyer
+* Reactivate lawyer
+
+Example:
+
+```text
+JC-LAW-1001
+Arun Kumar
+Civil Law
+Tamil / English
+
+✓ VERIFIED SAMPLE LAWYER
+
+[View] [Edit] [Suspend]
+```
+
+---
+
+# 25. ADMIN — CASE MANAGEMENT
+
+Admin can:
+
+* View sample cases
+* Add case
+* Edit case
+* Update status
+* Add hearing
+* Update monitoring status
+
+Monitoring:
+
+* Normal Monitoring
+* Needs Attention
+* Long-Pending
+
+---
+
+# 26. ADMIN — COMPLAINT MANAGEMENT
+
+Admin can:
+
+* View complaints
+* Filter complaints
+* Open complaint
+* Update status
+* Add guidance/update
+
+Statuses:
+
+* Submitted
+* Under Review
+* Guidance Provided
+* Closed
+
+Again, no real authority submission.
+
+---
+
+# 27. ADMIN — AWARENESS CONTENT
+
+Admin can:
+
+* Add article
+* Edit article
+* Delete article
+* Publish/unpublish article
+
+---
+
+# 28. DATABASE
+
+Use PostgreSQL with a moderate schema.
+
+Create these tables:
+
+### users
+
+* id
+* name
+* email
+* password_hash
+* role
+* language
+* created_at
+
+### lawyers
+
+* id
+* lawyer_id
+* user_id
+* name
+* sample_registration_number
+* specialization
+* location
+* languages
+* experience
+* availability
+* verification_status
+* is_sample
+
+### cases
+
+* id
+* case_number
+* title
+* citizen_id
+* lawyer_id
+* court
+* location
+* filing_date
+* current_status
+* monitoring_status
+
+### hearings
+
+* id
+* case_id
+* hearing_date
+* time
+* stage
+* result
+* adjournment_reason
+
+### documents
+
+* id
+* case_id
+* uploaded_by
+* file_name
+* file_type
+* file_path
+* explanation
+
+### legal_questions
+
+* id
+* citizen_id
+* lawyer_id
+* category
+* question
+* status
+* created_at
+
+### legal_responses
+
+* id
+* question_id
+* lawyer_id
+* response
+* created_at
+
+### complaints
+
+* id
+* citizen_id
+* category
+* description
+* location
+* status
+* guidance
+* created_at
+
+### awareness_articles
+
+* id
+* title
+* category
+* summary
+* content
+* language
+* published
+
+### notifications
+
+* id
+* user_id
+* title
+* message
+* type
+* is_read
+* created_at
+
+---
+
+# 29. REST API
+
+Create simple REST endpoints.
+
+### Authentication
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+GET /api/auth/me
+```
+
+### Cases
+
+```text
+GET /api/cases
+GET /api/cases/:id
+POST /api/cases
+PUT /api/cases/:id
+```
+
+### Hearings
+
+```text
+GET /api/cases/:id/hearings
+POST /api/cases/:id/hearings
+PUT /api/hearings/:id
+```
+
+### Documents
+
+```text
+GET /api/cases/:id/documents
+POST /api/documents
+```
+
+### Lawyers
+
+```text
+GET /api/lawyers
+GET /api/lawyers/:id
+POST /api/lawyers
+PUT /api/lawyers/:id
+```
+
+Support filters:
+
+```text
+location
+language
+specialization
+```
+
+### Questions
+
+```text
+GET /api/questions
+POST /api/questions
+GET /api/questions/:id
+POST /api/questions/:id/respond
+```
+
+### Complaints
+
+```text
+GET /api/complaints
+POST /api/complaints
+PUT /api/complaints/:id
+```
+
+### Awareness
+
+```text
+GET /api/awareness
+GET /api/awareness/:id
+POST /api/awareness
+PUT /api/awareness/:id
+```
+
+### Notifications
+
+```text
+GET /api/notifications
+PUT /api/notifications/:id/read
+```
+
+---
+
+# 30. SAMPLE DATA
+
+Seed the database with enough fictional data to make the application immediately demonstrable.
+
+Create:
+
+### Citizens
+
+3–5 sample citizens.
+
+### Lawyers
+
+At least 5 sample lawyers:
+
+```text
+JC-LAW-1001
+JC-LAW-1002
+JC-LAW-1003
+JC-LAW-1004
+JC-LAW-1005
+```
+
+Use fictional names and clearly mark them as sample professionals.
+
+### Cases
+
+At least 5 sample cases.
+
+Include:
+
+* Normal Monitoring
+* Needs Attention
+* Long-Pending
+
+### Hearings
+
+Create multiple hearings for sample cases.
+
+### Documents
+
+Create sample document records.
+
+### Questions
+
+Create sample citizen questions and some lawyer responses.
+
+### Complaints
+
+Create several sample complaints with different statuses.
+
+### Awareness
+
+Create at least 8 sample awareness articles.
+
+---
+
+# 31. DEMO ACCOUNTS
+
+Create simple seeded demo accounts.
+
+### Citizen
+
+```text
+Email: citizen@example.com
+Password: password123
+```
+
+### Lawyer
+
+```text
+Lawyer ID: JC-LAW-1001
+Email: lawyer@example.com
+Password: password123
+```
+
+### Admin
+
+```text
+Email: admin@example.com
+Password: admin12345
+```
+
+Clearly label these as:
+
+> DEMO ACCOUNT
+
+---
+
+# 32. DESIGN / UI
+
+The UI should look like a **professional civic-tech platform**, not an AI-generated generic dashboard.
+
+Design principles:
+
+* Trustworthy
+* Calm
+* Modern
+* Professional
+* Accessible
+* Clean
+* Minimal
+* Mobile-first
+
+Use:
+
+* White/light backgrounds
+* Professional blue/navy primary color
+* Subtle accent color
+* Rounded cards
+* Clear icons
+* Consistent spacing
+* Clear typography
+
+Avoid:
+
+* Excessive gradients
+* Excessive animations
+* Too many cards
+* Neon colors
+* Overly futuristic AI visuals
+* Unnecessary decorative elements
+
+The interface should look like a genuine **college UI/UX case study turned into a working application**.
+
+---
+
+# 33. RESPONSIVE DESIGN
+
+The application must work properly on:
+
+* Desktop
+* Laptop
+* Tablet
+* Mobile
+
+Citizen pages are especially important on mobile.
+
+Use:
+
+* Responsive sidebar
+* Mobile navigation
+* Responsive cards
+* Responsive tables
+* Touch-friendly buttons
+
+---
+
+# 34. SECURITY — MODERATE ONLY
+
+Implement basic security:
+
+* bcrypt password hashing
+* JWT authentication
+* Protected routes
+* Role-based middleware
+* Basic input validation
+* Do not expose password hashes
+* Basic error handling
+
+Do NOT implement enterprise-level security infrastructure.
+
+---
+
+# 35. IMPORTANT LEGAL DISCLAIMERS
+
+Use appropriate disclaimers throughout the application.
+
+Main disclaimer:
+
+> **Justice Connect is an academic/demo prototype using fictional sample data. It does not provide legal advice, predict legal outcomes, or connect to real court or government databases.**
+
+Lawyer disclaimer:
+
+> **Lawyer profiles shown in this prototype are fictional sample professionals and are not real-world verification records.**
+
+AI disclaimer:
+
+> **Document explanations are provided for demonstration purposes only and are not legal advice.**
+
+Complaint disclaimer:
+
+> **This prototype does not submit complaints to real authorities.**
+
+---
+
+# 36. FINAL USER EXPERIENCE
+
+The main Citizen journey should be:
+
+```text
+Landing Page
+      ↓
+Simple Login
+      ↓
+Citizen Dashboard
+      ↓
+Search Case
+      ↓
+Case Details
+      ↓
+Timeline + Hearings
+      ↓
+Documents
+      ↓
+Document Explanation
+      ↓
+Get Legal Help
+      ↓
+Find Lawyer
+      ↓
+Ask Lawyer
+      ↓
+Receive Sample Response
+```
+
+Additional journeys:
+
+```text
+Citizen
+  ↓
+Raise Your Voice
+  ↓
+Guidance
+  ↓
+Track Status
+```
+
+```text
+Citizen
+  ↓
+Legal Awareness
+  ↓
+Read Simple Articles
+```
+
+```text
+Admin
+  ↓
+Lawyer Management
+  ↓
+Verify Sample Lawyer
+  ↓
+Generate/Manage Lawyer ID
+```
+
+```text
+Lawyer
+  ↓
+Dashboard
+  ↓
+Assigned Cases
+  ↓
+Citizen Questions
+  ↓
+Respond
+```
+
+---
+
+# 37. MOST IMPORTANT IMPLEMENTATION RULE
+
+Do not make this project unnecessarily complicated.
+
+This is a **college project and UI/UX internship demonstration**.
+
+Prioritize:
+
+1. Good UI/UX
+2. Working navigation
+3. Real database integration
+4. Working REST APIs
+5. Simple authentication
+6. Three role-based dashboards
+7. Lawyer search
+8. Sample lawyer verification
+9. Ask-a-lawyer workflow
+10. Case timeline
+11. Document explainer demo
+12. Complaint guidance
+13. Legal awareness
+
+If a feature would require significant external infrastructure, replace it with a **working prototype/demo implementation**.
+
+The final application should feel like a **complete, working full-stack academic prototype**, not a production legal platform.
+
+---
+
+# 38. FINAL CHECKLIST
+
+Before finishing, verify:
+
+* [ ] Citizen Sign Up works
+* [ ] Citizen Sign In works
+* [ ] No OTP anywhere
+* [ ] No Google/social login
+* [ ] Password minimum is 8 characters
+* [ ] Lawyer login works
+* [ ] Admin login works
+* [ ] Three dashboards work
+* [ ] Role-based routing works
+* [ ] Case search works
+* [ ] Case timeline works
+* [ ] Hearing information works
+* [ ] Case monitoring works
+* [ ] Long-pending cases work
+* [ ] Document upload works
+* [ ] Document explainer demo works
+* [ ] Find Lawyer works
+* [ ] Lawyer filters work
+* [ ] Unique Lawyer IDs work
+* [ ] Sample lawyer verification works
+* [ ] Ask-a-Lawyer works
+* [ ] Lawyer response works
+* [ ] Raise Your Voice works
+* [ ] Complaint status works
+* [ ] Legal awareness works
+* [ ] English/Tamil language option works
+* [ ] Voice demo works
+* [ ] Notifications work
+* [ ] Admin lawyer management works
+* [ ] Admin case management works
+* [ ] Admin complaint management works
+* [ ] PostgreSQL is connected
+* [ ] REST APIs work
+* [ ] Sample data is seeded
+* [ ] Responsive mobile UI works
+* [ ] Legal disclaimers are visible
+* [ ] No real-world legal claims are made
+
+Build the project **module by module**, test each module, and keep the implementation simple enough that a college student can understand and explain the entire project during a viva.

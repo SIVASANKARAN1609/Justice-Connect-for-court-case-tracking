@@ -881,6 +881,11 @@ components:
     LawyerUpdate:
       allOf:
         - $ref: "#/components/schemas/LawyerInput"
+        - type: object
+          properties:
+            verificationStatus:
+              type: string
+              enum: [Verified Sample Lawyer, Verification Required, Rejected, Suspended]
     VerificationInput:
       type: object
       required: [sampleRegistrationNumber]

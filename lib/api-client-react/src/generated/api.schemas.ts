@@ -224,7 +224,19 @@ export interface LawyerInput {
   availability: string;
 }
 
-export type LawyerUpdate = LawyerInput;
+export type LawyerUpdateVerificationStatus = typeof LawyerUpdateVerificationStatus[keyof typeof LawyerUpdateVerificationStatus];
+
+
+export const LawyerUpdateVerificationStatus = {
+  Verified_Sample_Lawyer: 'Verified Sample Lawyer',
+  Verification_Required: 'Verification Required',
+  Rejected: 'Rejected',
+  Suspended: 'Suspended',
+} as const;
+
+export type LawyerUpdate = LawyerInput & {
+  verificationStatus?: LawyerUpdateVerificationStatus;
+};
 
 export interface VerificationInput {
   sampleRegistrationNumber: string;

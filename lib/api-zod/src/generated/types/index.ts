@@ -33,6 +33,7 @@ export * from './hearingUpdate';
 export * from './lawyer';
 export * from './lawyerInput';
 export * from './lawyerUpdate';
+export * from './lawyerUpdateVerificationStatus';
 export * from './lawyerVerificationStatus';
 export * from './legalQuestion';
 export * from './legalQuestionStatus';

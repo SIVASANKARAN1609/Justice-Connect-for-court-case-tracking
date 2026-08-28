@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
-import { and, asc, count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, or } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   awarenessArticlesTable,
@@ -126,10 +126,11 @@ async function caseView(row: {
   citizenName: string | null;
   lawyerName: string | null;
 }) {
+  const today = new Date().toISOString().slice(0, 10);
   const [hearing] = await db
     .select()
     .from(hearingsTable)
-    .where(eq(hearingsTable.caseId, row.case.id))
+    .where(and(eq(hearingsTable.caseId, row.case.id), gte(hearingsTable.hearingDate, today)))
     .orderBy(asc(hearingsTable.hearingDate))
     .limit(1);
   return {
@@ -518,12 +519,19 @@ router.get("/lawyers/:id", async (req, res): Promise<void> => {
   res.json(GetLawyerResponse.parse(lawyerView(lawyer)));
 });
 
-router.put("/lawyers/:id", async (req, res): Promise<void> => {
+router.put("/lawyers/:id", requireRole("admin", "lawyer"), async (req, res): Promise<void> => {
   const params = UpdateLawyerParams.safeParse(req.params);
   const parsed = UpdateLawyerBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
     res.status(400).json({ error: "Invalid lawyer update" });
     return;
+  }
+  if (req.authUser!.role === "lawyer") {
+    const profile = await lawyerProfileForUser(req.authUser!.id);
+    if (!profile || profile.id !== params.data.id) {
+      res.status(403).json({ error: "You can only update your own profile" });
+      return;
+    }
   }
   const [updated] = await db.update(lawyersTable).set(parsed.data).where(eq(lawyersTable.id, params.data.id)).returning();
   if (!updated) {
@@ -680,8 +688,10 @@ router.put("/complaints/:id", requireRole("admin"), async (req, res): Promise<vo
   }));
 });
 
-router.get("/awareness", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(awarenessArticlesTable).orderBy(asc(awarenessArticlesTable.id));
+router.get("/awareness", async (req, res): Promise<void> => {
+  const rows = req.authUser!.role === "admin"
+    ? await db.select().from(awarenessArticlesTable).orderBy(asc(awarenessArticlesTable.id))
+    : await db.select().from(awarenessArticlesTable).where(eq(awarenessArticlesTable.published, true)).orderBy(asc(awarenessArticlesTable.id));
   res.json(ListAwarenessResponse.parse(rows));
 });
 
