@@ -16,4 +16,12 @@ export interface RegisterInput {
   password: string;
   role?: RegisterInputRole;
   language?: RegisterInputLanguage;
+  sampleRegistrationNumber?: string;
+  verificationDocumentName?: string;
+  specialization?: string;
+  location?: string;
+  languages?: string[];
+  /** @minimum 0 */
+  experience?: number;
+  availability?: string;
 }

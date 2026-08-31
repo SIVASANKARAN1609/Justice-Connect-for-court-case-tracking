@@ -731,6 +731,15 @@ components:
         password: { type: string, minLength: 8 }
         role: { type: string, enum: [citizen, lawyer], default: citizen }
         language: { type: string, enum: [English, Tamil], default: English }
+        sampleRegistrationNumber: { type: string }
+        verificationDocumentName: { type: string }
+        specialization: { type: string }
+        location: { type: string }
+        languages:
+          type: array
+          items: { type: string }
+        experience: { type: integer, minimum: 0 }
+        availability: { type: string }
     LoginInput:
       type: object
       required: [identifier, password]
@@ -857,6 +866,8 @@ components:
         lawyerId: { type: string }
         name: { type: string }
         email: { type: ["string", "null"] }
+        sampleRegistrationNumber: { type: string }
+        verificationDocumentName: { type: ["string", "null"] }
         specialization: { type: string }
         location: { type: string }
         languages:
@@ -872,6 +883,8 @@ components:
       properties:
         name: { type: string }
         email: { type: string, format: email }
+        sampleRegistrationNumber: { type: string }
+        verificationDocumentName: { type: string }
         specialization: { type: string }
         location: { type: string }
         languages:
@@ -892,6 +905,7 @@ components:
       required: [sampleRegistrationNumber]
       properties:
         sampleRegistrationNumber: { type: string }
+        decision: { type: string, enum: [verify, reject], default: verify }
     VerificationResult:
       type: object
       required: [verified, message]

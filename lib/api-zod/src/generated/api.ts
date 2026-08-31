@@ -26,13 +26,23 @@ export const registerBodyPasswordMin = 8;
 
 export const registerBodyRoleDefault = `citizen`;
 export const registerBodyLanguageDefault = `English`;
+export const registerBodyExperienceMin = 0;
+
+
 
 export const RegisterBody = zod.object({
   "name": zod.string().min(registerBodyNameMin),
   "email": zod.email(),
   "password": zod.string().min(registerBodyPasswordMin),
   "role": zod.enum(['citizen', 'lawyer']).default(registerBodyRoleDefault),
-  "language": zod.enum(['English', 'Tamil']).default(registerBodyLanguageDefault)
+  "language": zod.enum(['English', 'Tamil']).default(registerBodyLanguageDefault),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().optional(),
+  "specialization": zod.string().optional(),
+  "location": zod.string().optional(),
+  "languages": zod.array(zod.string()).optional(),
+  "experience": zod.int().min(registerBodyExperienceMin).optional(),
+  "availability": zod.string().optional()
 })
 
 export const RegisterResponse = zod.object({
@@ -402,6 +412,8 @@ export const ListLawyersResponseItem = zod.object({
   "lawyerId": zod.string(),
   "name": zod.string(),
   "email": zod.string().nullish(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().nullish(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),
@@ -423,6 +435,8 @@ export const createLawyerBodyExperienceMin = 0;
 export const CreateLawyerBody = zod.object({
   "name": zod.string(),
   "email": zod.email().optional(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().optional(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),
@@ -435,6 +449,8 @@ export const CreateLawyerResponse = zod.object({
   "lawyerId": zod.string(),
   "name": zod.string(),
   "email": zod.string().nullish(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().nullish(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),
@@ -457,6 +473,8 @@ export const GetLawyerResponse = zod.object({
   "lawyerId": zod.string(),
   "name": zod.string(),
   "email": zod.string().nullish(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().nullish(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),
@@ -481,6 +499,8 @@ export const updateLawyerBodyOneExperienceMin = 0;
 export const UpdateLawyerBody = zod.object({
   "name": zod.string(),
   "email": zod.email().optional(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().optional(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),
@@ -495,6 +515,8 @@ export const UpdateLawyerResponse = zod.object({
   "lawyerId": zod.string(),
   "name": zod.string(),
   "email": zod.string().nullish(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().nullish(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),
@@ -512,8 +534,11 @@ export const VerifyLawyerParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const verifyLawyerBodyDecisionDefault = `verify`;
+
 export const VerifyLawyerBody = zod.object({
-  "sampleRegistrationNumber": zod.string()
+  "sampleRegistrationNumber": zod.string(),
+  "decision": zod.enum(['verify', 'reject']).default(verifyLawyerBodyDecisionDefault)
 })
 
 export const VerifyLawyerResponse = zod.object({
@@ -524,6 +549,8 @@ export const VerifyLawyerResponse = zod.object({
   "lawyerId": zod.string(),
   "name": zod.string(),
   "email": zod.string().nullish(),
+  "sampleRegistrationNumber": zod.string().optional(),
+  "verificationDocumentName": zod.string().nullish(),
   "specialization": zod.string(),
   "location": zod.string(),
   "languages": zod.array(zod.string()),

@@ -57,4 +57,5 @@ export * from './userLanguage';
 export * from './userRole';
 export * from './userUpdate';
 export * from './verificationInput';
+export * from './verificationInputDecision';
 export * from './verificationResult';

@@ -9,6 +9,8 @@
 export interface LawyerInput {
   name: string;
   email?: string;
+  sampleRegistrationNumber?: string;
+  verificationDocumentName?: string;
   specialization: string;
   location: string;
   languages: string[];

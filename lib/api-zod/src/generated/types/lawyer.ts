@@ -13,6 +13,9 @@ export interface Lawyer {
   name: string;
   /** @nullable */
   email?: string | null;
+  sampleRegistrationNumber?: string;
+  /** @nullable */
+  verificationDocumentName?: string | null;
   specialization: string;
   location: string;
   languages: string[];

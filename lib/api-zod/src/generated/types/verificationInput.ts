@@ -5,7 +5,9 @@
  * Justice Connect academic prototype API
  * OpenAPI spec version: 0.1.0
  */
+import type { VerificationInputDecision } from './verificationInputDecision';
 
 export interface VerificationInput {
   sampleRegistrationNumber: string;
+  decision?: VerificationInputDecision;
 }

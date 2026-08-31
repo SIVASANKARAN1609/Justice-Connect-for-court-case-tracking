@@ -31,6 +31,7 @@ export const lawyersTable = pgTable("lawyers", {
   name: text("name").notNull(),
   email: text("email"),
   sampleRegistrationNumber: text("sample_registration_number").notNull(),
+  verificationDocumentName: text("verification_document_name"),
   specialization: text("specialization").notNull(),
   location: text("location").notNull(),
   languages: text("languages").array().notNull(),

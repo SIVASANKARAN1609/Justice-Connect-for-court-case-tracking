@@ -78,6 +78,14 @@ export interface RegisterInput {
   password: string;
   role?: RegisterInputRole;
   language?: RegisterInputLanguage;
+  sampleRegistrationNumber?: string;
+  verificationDocumentName?: string;
+  specialization?: string;
+  location?: string;
+  languages?: string[];
+  /** @minimum 0 */
+  experience?: number;
+  availability?: string;
 }
 
 export interface LoginInput {
@@ -213,6 +221,9 @@ export interface Lawyer {
   name: string;
   /** @nullable */
   email?: string | null;
+  sampleRegistrationNumber?: string;
+  /** @nullable */
+  verificationDocumentName?: string | null;
   specialization: string;
   location: string;
   languages: string[];
@@ -225,6 +236,8 @@ export interface Lawyer {
 export interface LawyerInput {
   name: string;
   email?: string;
+  sampleRegistrationNumber?: string;
+  verificationDocumentName?: string;
   specialization: string;
   location: string;
   languages: string[];
@@ -247,8 +260,17 @@ export type LawyerUpdate = LawyerInput & {
   verificationStatus?: LawyerUpdateVerificationStatus;
 };
 
+export type VerificationInputDecision = typeof VerificationInputDecision[keyof typeof VerificationInputDecision];
+
+
+export const VerificationInputDecision = {
+  verify: 'verify',
+  reject: 'reject',
+} as const;
+
 export interface VerificationInput {
   sampleRegistrationNumber: string;
+  decision?: VerificationInputDecision;
 }
 
 export interface VerificationResult {

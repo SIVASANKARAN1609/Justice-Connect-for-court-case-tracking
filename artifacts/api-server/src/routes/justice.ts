@@ -181,6 +181,8 @@ function lawyerView(lawyer: Lawyer) {
     lawyerId: lawyer.lawyerId,
     name: lawyer.name,
     email: lawyer.email,
+    sampleRegistrationNumber: lawyer.sampleRegistrationNumber,
+    verificationDocumentName: lawyer.verificationDocumentName,
     specialization: lawyer.specialization,
     location: lawyer.location,
     languages: lawyer.languages,
@@ -222,6 +224,10 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: "An account with that email already exists" });
     return;
   }
+  if (parsed.data.role === "lawyer" && (!parsed.data.sampleRegistrationNumber?.trim() || !parsed.data.verificationDocumentName?.trim())) {
+    res.status(400).json({ error: "Lawyer applications need a council/registration number and a verification document name" });
+    return;
+  }
   const [user] = await db.insert(usersTable).values({
     name: parsed.data.name,
     email: parsed.data.email.toLowerCase(),
@@ -237,7 +243,8 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       userId: user.id,
       name: user.name,
       email: user.email,
-      sampleRegistrationNumber: `PENDING-${user.id}`,
+      sampleRegistrationNumber: parsed.data.sampleRegistrationNumber!.trim(),
+      verificationDocumentName: parsed.data.verificationDocumentName!.trim(),
       specialization: "General Practice",
       location: "To be added",
       languages: [user.language],
@@ -520,7 +527,8 @@ router.post("/lawyers", requireRole("admin"), async (req, res): Promise<void> =>
   const [created] = await db.insert(lawyersTable).values({
     ...parsed.data,
     lawyerId: `JC-LAW-${nextNumber}`,
-    sampleRegistrationNumber: `SAMPLE-REG-${nextNumber}`,
+    sampleRegistrationNumber: parsed.data.sampleRegistrationNumber || `SAMPLE-REG-${nextNumber}`,
+    verificationDocumentName: parsed.data.verificationDocumentName || "admin-added-fictional-document.pdf",
     languages: parsed.data.languages,
     verificationStatus: "Verification Required",
     isSample: true,
@@ -576,11 +584,12 @@ router.post("/lawyers/:id/verify", requireRole("admin"), async (req, res): Promi
     res.status(404).json({ error: "Lawyer not found" });
     return;
   }
-  const verified = lawyer.sampleRegistrationNumber === parsed.data.sampleRegistrationNumber;
-  const [updated] = await db.update(lawyersTable).set({ verificationStatus: verified ? "Verified Sample Lawyer" : "Verification Required" }).where(eq(lawyersTable.id, lawyer.id)).returning();
+  const rejected = parsed.data.decision === "reject";
+  const verified = !rejected && lawyer.sampleRegistrationNumber.trim().toLowerCase() === parsed.data.sampleRegistrationNumber.trim().toLowerCase();
+  const [updated] = await db.update(lawyersTable).set({ verificationStatus: rejected ? "Rejected" : verified ? "Verified Sample Lawyer" : "Verification Required" }).where(eq(lawyersTable.id, lawyer.id)).returning();
   res.json(VerifyLawyerResponse.parse({
     verified,
-    message: verified ? "VERIFIED SAMPLE LAWYER" : "Verification Required",
+    message: rejected ? "APPLICATION REJECTED" : verified ? "VERIFIED SAMPLE LAWYER" : "Verification Required",
     lawyer: lawyerView(updated),
   }));
 });
