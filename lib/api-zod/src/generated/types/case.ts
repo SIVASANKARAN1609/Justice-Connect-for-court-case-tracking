@@ -11,6 +11,9 @@ export interface Case {
   id: number;
   caseNumber: string;
   title: string;
+  category: string;
+  description: string;
+  requiredAction: string;
   /** @nullable */
   citizenName?: string | null;
   /** @nullable */

@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AppointmentOrder,
   AuthResponse,
   AwarenessArticle,
   AwarenessInput,
@@ -28,10 +29,13 @@ import type {
   Case,
   CaseDetail,
   CaseInput,
+  CaseMessage,
+  CaseMessageInput,
   CaseUpdate,
   Complaint,
   ComplaintInput,
   ComplaintUpdate,
+  CreateAppointmentOrderBody,
   DashboardSummary,
   Document,
   DocumentInput,
@@ -54,6 +58,7 @@ import type {
   RegisterInput,
   ResponseInput,
   UnauthorizedResponse,
+  UpdateAppointmentOrderStatusBody,
   User,
   UserUpdate,
   VerificationInput,
@@ -305,6 +310,226 @@ export const useLogin = <TError = ErrorType<UnauthorizedResponse>,
         TContext
       > => {
       return useMutation(getLoginMutationOptions(options));
+    }
+
+export const getListAppointmentsUrl = () => {
+
+
+
+
+  return `/api/appointments`
+}
+
+/**
+ * @summary List appointment orders (Citizen/Lawyer)
+ */
+export const listAppointments = async ( options?: Parameters<typeof customFetch>[1]): Promise<AppointmentOrder[]> => {
+
+  return customFetch<AppointmentOrder[]>(getListAppointmentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAppointmentsQueryKey = () => {
+    return [
+    `/api/appointments`
+    ] as const;
+    }
+
+
+export const getListAppointmentsQueryOptions = <TData = Awaited<ReturnType<typeof listAppointments>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAppointments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAppointmentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAppointments>>> = ({ signal }) => listAppointments({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAppointments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAppointmentsQueryResult = NonNullable<Awaited<ReturnType<typeof listAppointments>>>
+export type ListAppointmentsQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary List appointment orders (Citizen/Lawyer)
+ */
+
+export function useListAppointments<TData = Awaited<ReturnType<typeof listAppointments>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAppointments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAppointmentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateAppointmentUrl = () => {
+
+
+
+
+  return `/api/appointments`
+}
+
+/**
+ * @summary Create an appointment order (Citizen)
+ */
+export const createAppointment = async (createAppointmentOrderBody: CreateAppointmentOrderBody, options?: Parameters<typeof customFetch>[1]): Promise<AppointmentOrder> => {
+
+  return customFetch<AppointmentOrder>(getCreateAppointmentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createAppointmentOrderBody)
+  }
+);}
+
+
+
+
+
+export const getCreateAppointmentMutationOptions = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAppointment>>, TError,{data: BodyType<CreateAppointmentOrderBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAppointment>>, TError,{data: BodyType<CreateAppointmentOrderBody>}, TContext> => {
+
+const mutationKey = ['createAppointment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAppointment>>, {data: BodyType<CreateAppointmentOrderBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAppointment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAppointmentMutationResult = NonNullable<Awaited<ReturnType<typeof createAppointment>>>
+    export type CreateAppointmentMutationBody = BodyType<CreateAppointmentOrderBody>
+    export type CreateAppointmentMutationError = ErrorType<UnauthorizedResponse>
+
+    /**
+ * @summary Create an appointment order (Citizen)
+ */
+export const useCreateAppointment = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAppointment>>, TError,{data: BodyType<CreateAppointmentOrderBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAppointment>>,
+        TError,
+        {data: BodyType<CreateAppointmentOrderBody>},
+        TContext
+      > => {
+      return useMutation(getCreateAppointmentMutationOptions(options));
+    }
+
+export const getUpdateAppointmentStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/appointments/${id}/status`
+}
+
+/**
+ * @summary Accept or reject an appointment (Lawyer)
+ */
+export const updateAppointmentStatus = async (id: number,
+    updateAppointmentOrderStatusBody: UpdateAppointmentOrderStatusBody, options?: Parameters<typeof customFetch>[1]): Promise<AppointmentOrder> => {
+
+  return customFetch<AppointmentOrder>(getUpdateAppointmentStatusUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateAppointmentOrderStatusBody)
+  }
+);}
+
+
+
+
+
+export const getUpdateAppointmentStatusMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAppointmentStatus>>, TError,{id: number;data: BodyType<UpdateAppointmentOrderStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAppointmentStatus>>, TError,{id: number;data: BodyType<UpdateAppointmentOrderStatusBody>}, TContext> => {
+
+const mutationKey = ['updateAppointmentStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAppointmentStatus>>, {id: number;data: BodyType<UpdateAppointmentOrderStatusBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAppointmentStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAppointmentStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateAppointmentStatus>>>
+    export type UpdateAppointmentStatusMutationBody = BodyType<UpdateAppointmentOrderStatusBody>
+    export type UpdateAppointmentStatusMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+    /**
+ * @summary Accept or reject an appointment (Lawyer)
+ */
+export const useUpdateAppointmentStatus = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAppointmentStatus>>, TError,{id: number;data: BodyType<UpdateAppointmentOrderStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAppointmentStatus>>,
+        TError,
+        {id: number;data: BodyType<UpdateAppointmentOrderStatusBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateAppointmentStatusMutationOptions(options));
     }
 
 export const getGetMeUrl = () => {
@@ -710,7 +935,7 @@ export const getCreateCaseUrl = () => {
 }
 
 /**
- * @summary Add a sample case
+ * @summary Submit a Justice Connect case
  */
 export const createCase = async (caseInput: CaseInput, options?: Parameters<typeof customFetch>[1]): Promise<Case> => {
 
@@ -759,7 +984,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateCaseMutationError = ErrorType<unknown>
 
     /**
- * @summary Add a sample case
+ * @summary Submit a Justice Connect case
  */
 export const useCreateCase = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCase>>, TError,{data: BodyType<CaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -919,6 +1144,155 @@ export const useUpdateCase = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateCaseMutationOptions(options));
+    }
+
+export const getListCaseMessagesUrl = (id: number,) => {
+
+
+
+
+  return `/api/cases/${id}/messages`
+}
+
+/**
+ * @summary List messages for a case
+ */
+export const listCaseMessages = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CaseMessage[]> => {
+
+  return customFetch<CaseMessage[]>(getListCaseMessagesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCaseMessagesQueryKey = (id: number,) => {
+    return [
+    `/api/cases/${id}/messages`
+    ] as const;
+    }
+
+
+export const getListCaseMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listCaseMessages>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaseMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCaseMessagesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCaseMessages>>> = ({ signal }) => listCaseMessages(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCaseMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCaseMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listCaseMessages>>>
+export type ListCaseMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List messages for a case
+ */
+
+export function useListCaseMessages<TData = Awaited<ReturnType<typeof listCaseMessages>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaseMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCaseMessagesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateCaseMessageUrl = (id: number,) => {
+
+
+
+
+  return `/api/cases/${id}/messages`
+}
+
+/**
+ * @summary Post a message to a case
+ */
+export const createCaseMessage = async (id: number,
+    caseMessageInput: CaseMessageInput, options?: Parameters<typeof customFetch>[1]): Promise<CaseMessage> => {
+
+  return customFetch<CaseMessage>(getCreateCaseMessageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(caseMessageInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCaseMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseMessage>>, TError,{id: number;data: BodyType<CaseMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaseMessage>>, TError,{id: number;data: BodyType<CaseMessageInput>}, TContext> => {
+
+const mutationKey = ['createCaseMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaseMessage>>, {id: number;data: BodyType<CaseMessageInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createCaseMessage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaseMessageMutationResult = NonNullable<Awaited<ReturnType<typeof createCaseMessage>>>
+    export type CreateCaseMessageMutationBody = BodyType<CaseMessageInput>
+    export type CreateCaseMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Post a message to a case
+ */
+export const useCreateCaseMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseMessage>>, TError,{id: number;data: BodyType<CaseMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaseMessage>>,
+        TError,
+        {id: number;data: BodyType<CaseMessageInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaseMessageMutationOptions(options));
     }
 
 export const getListHearingsUrl = (id: number,) => {

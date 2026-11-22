@@ -33,6 +33,7 @@ async function buildAll() {
       "better-sqlite3",
       "sqlite3",
       "canvas",
+      "pdf-parse",
       "bcrypt",
       "argon2",
       "fsevents",

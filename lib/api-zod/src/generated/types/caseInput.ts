@@ -5,17 +5,15 @@
  * Justice Connect academic prototype API
  * OpenAPI spec version: 0.1.0
  */
-import type { MonitoringStatus } from './monitoringStatus';
 
 export interface CaseInput {
-  caseNumber: string;
+  /** @minLength 3 */
   title: string;
+  /** @minLength 2 */
+  category: string;
+  /** @minLength 10 */
+  description: string;
+  location?: string;
+  court?: string;
   citizenId?: number;
-  /** @nullable */
-  lawyerId?: number | null;
-  court: string;
-  location: string;
-  filingDate: string;
-  currentStatus: string;
-  monitoringStatus: MonitoringStatus;
 }

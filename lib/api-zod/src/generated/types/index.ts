@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './appointmentOrder';
+export * from './appointmentOrderStatus';
 export * from './authResponse';
 export * from './awarenessArticle';
 export * from './awarenessArticleLanguage';
@@ -16,12 +18,15 @@ export * from './badRequestResponse';
 export * from './case';
 export * from './caseDetail';
 export * from './caseInput';
+export * from './caseMessage';
+export * from './caseMessageInput';
 export * from './caseUpdate';
 export * from './complaint';
 export * from './complaintInput';
 export * from './complaintStatus';
 export * from './complaintUpdate';
 export * from './complaintUpdateStatus';
+export * from './createAppointmentOrderBody';
 export * from './dashboardSummary';
 export * from './document';
 export * from './documentInput';
@@ -41,6 +46,7 @@ export * from './listCasesParams';
 export * from './listLawyersParams';
 export * from './listUsersParams';
 export * from './loginInput';
+export * from './loginInputRole';
 export * from './managedUser';
 export * from './monitoringStatus';
 export * from './notFoundResponse';
@@ -52,6 +58,8 @@ export * from './registerInputRole';
 export * from './responseInput';
 export * from './searchParameter';
 export * from './unauthorizedResponse';
+export * from './updateAppointmentOrderStatusBody';
+export * from './updateAppointmentOrderStatusBodyStatus';
 export * from './user';
 export * from './userLanguage';
 export * from './userRole';

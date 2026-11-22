@@ -19,6 +19,7 @@ tags:
   - name: complaints
   - name: awareness
   - name: notifications
+  - name: appointments
 paths:
   /healthz:
     get:
@@ -73,6 +74,71 @@ paths:
                 $ref: "#/components/schemas/AuthResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /appointments:
+    get:
+      operationId: listAppointments
+      tags: [appointments]
+      security: [{ bearerAuth: [] }]
+      summary: List appointment orders (Citizen/Lawyer)
+      responses:
+        "200":
+          description: List of appointment orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppointmentOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      security: [{ bearerAuth: [] }]
+      summary: Create an appointment order (Citizen)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentOrderBody"
+      responses:
+        "201":
+          description: Appointment order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /appointments/{id}/status:
+    post:
+      operationId: updateAppointmentStatus
+      tags: [appointments]
+      security: [{ bearerAuth: [] }]
+      summary: Accept or reject an appointment (Lawyer)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentOrderStatusBody"
+      responses:
+        "200":
+          description: Appointment order updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /auth/me:
     get:
       operationId: getMe
@@ -166,7 +232,7 @@ paths:
       operationId: createCase
       tags: [cases]
       security: [{ bearerAuth: [] }]
-      summary: Add a sample case
+      summary: Submit a Justice Connect case
       requestBody:
         required: true
         content:
@@ -217,6 +283,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Case"
+  /cases/{id}/messages:
+    get:
+      operationId: listCaseMessages
+      tags: [cases]
+      security: [{ bearerAuth: [] }]
+      summary: List messages for a case
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaseMessage"
+    post:
+      operationId: createCaseMessage
+      tags: [cases]
+      security: [{ bearerAuth: [] }]
+      summary: Post a message to a case
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseMessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseMessage"
   /cases/{id}/hearings:
     get:
       operationId: listHearings
@@ -699,6 +802,7 @@ components:
       required: [id, name, email, role, language]
       properties:
         id: { type: integer }
+        justiceId: { type: ["string", "null"] }
         name: { type: string }
         email: { type: string }
         role:
@@ -742,16 +846,51 @@ components:
         availability: { type: string }
     LoginInput:
       type: object
-      required: [identifier, password]
+      required: [identifier, password, role]
       properties:
         identifier: { type: string, minLength: 1 }
         password: { type: string, minLength: 8 }
+        role: { type: string, enum: [citizen, lawyer, admin] }
     AuthResponse:
       type: object
       required: [token, user]
       properties:
         token: { type: string }
         user: { $ref: "#/components/schemas/User" }
+    AppointmentOrder:
+      type: object
+      required: [id, citizenId, lawyerId, caseType, subject, description, status, createdAt]
+      properties:
+        id: { type: integer }
+        citizenId: { type: integer }
+        lawyerId: { type: integer }
+        caseId: { type: ["integer", "null"] }
+        caseNumber: { type: ["string", "null"] }
+        caseType: { type: string }
+        subject: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [PENDING, ACCEPTED, REJECTED, COMPLETED] }
+        scheduledDate: { type: string }
+        scheduledTime: { type: string }
+        scheduledPlace: { type: string }
+        createdAt: { type: string }
+    CreateAppointmentOrderBody:
+      type: object
+      required: [lawyerId, caseType, subject, description]
+      properties:
+        lawyerId: { type: integer }
+        caseId: { type: integer }
+        caseType: { type: string }
+        subject: { type: string }
+        description: { type: string }
+    UpdateAppointmentOrderStatusBody:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ACCEPTED, REJECTED] }
+        scheduledDate: { type: string }
+        scheduledTime: { type: string }
+        scheduledPlace: { type: string }
     DashboardSummary:
       type: object
       required: [role, activeCases, upcomingHearings, pendingQuestions, notifications, complaints]
@@ -770,11 +909,14 @@ components:
       enum: [Normal Monitoring, Needs Attention, Long-Pending]
     Case:
       type: object
-      required: [id, caseNumber, title, court, location, filingDate, currentStatus, monitoringStatus, caseAge, nextHearing]
+      required: [id, caseNumber, title, category, description, requiredAction, court, location, filingDate, currentStatus, monitoringStatus, caseAge, nextHearing]
       properties:
         id: { type: integer }
         caseNumber: { type: string }
         title: { type: string }
+        category: { type: string }
+        description: { type: string }
+        requiredAction: { type: string }
         citizenName: { type: ["string", "null"] }
         lawyerName: { type: ["string", "null"] }
         court: { type: string }
@@ -796,19 +938,31 @@ components:
             documents:
               type: array
               items: { $ref: "#/components/schemas/Document" }
+    CaseMessage:
+      type: object
+      required: [id, caseId, senderId, senderName, content, createdAt]
+      properties:
+        id: { type: integer }
+        caseId: { type: integer }
+        senderId: { type: integer }
+        senderName: { type: string }
+        content: { type: string }
+        createdAt: { type: string }
+    CaseMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
     CaseInput:
       type: object
-      required: [caseNumber, title, court, location, filingDate, currentStatus, monitoringStatus]
+      required: [title, category, description]
       properties:
-        caseNumber: { type: string }
-        title: { type: string }
-        citizenId: { type: integer }
-        lawyerId: { type: ["integer", "null"] }
-        court: { type: string }
+        title: { type: string, minLength: 3 }
+        category: { type: string, minLength: 2 }
+        description: { type: string, minLength: 10 }
         location: { type: string }
-        filingDate: { type: string }
-        currentStatus: { type: string }
-        monitoringStatus: { $ref: "#/components/schemas/MonitoringStatus" }
+        court: { type: string }
+        citizenId: { type: integer }
     CaseUpdate:
       type: object
       properties:

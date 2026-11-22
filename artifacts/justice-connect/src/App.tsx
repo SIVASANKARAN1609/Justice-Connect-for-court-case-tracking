@@ -1,55 +1,187 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Link, Route, Switch, Router as WouterRouter, useLocation, useParams } from 'wouter';
 import {
-  Activity, AlertTriangle, ArrowLeft, ArrowRight, Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check,
-  ChevronRight, CircleAlert, ClipboardList, FileText, Gavel, HeartHandshake, Info,
-  Landmark, LayoutDashboard, LifeBuoy, LogOut, Menu, MessageCircleQuestion, Mic, Pencil, Plus,
-  Search, Send, Settings, ShieldCheck, Sparkles, UserRound, Users, X, Upload, Scale
-} from 'lucide-react';
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import {
-  getGetAwarenessQueryKey, getGetCaseQueryKey, getGetDashboardSummaryQueryKey,
-  getGetLawyerQueryKey, getGetMeQueryKey, getListAwarenessQueryKey, getListCasesQueryKey,
-  getListComplaintsQueryKey, getListDocumentsQueryKey, getListHearingsQueryKey,
-  getListLawyersQueryKey, getListNotificationsQueryKey, getListQuestionsQueryKey, getListUsersQueryKey,
-  useCreateAwareness, useCreateCase, useCreateComplaint, useCreateDocument, useCreateHearing,
-  useCreateLawyer, useCreateQuestion, useDeleteAwareness, useGetAwareness, useGetCase,
-  useGetDashboardSummary, useGetLawyer, useGetMe, useHealthCheck, useListAwareness, useListUsers,
-  useListCases, useListComplaints, useListDocuments, useListHearings, useListLawyers,
-  useListNotifications, useListQuestions, useLogin, useMarkNotificationRead, useRegister,
-  useRespondToQuestion, useUpdateAwareness, useUpdateCase, useUpdateComplaint, useUpdateHearing,
-  useUpdateLawyer, useUpdateUser, useVerifyLawyer, setAuthTokenGetter
-} from '@workspace/api-client-react';
-import type { Case, Lawyer } from '@workspace/api-client-react';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
-import { commonRights, simpleTerms, translate, type AppLanguage } from './i18n';
-import './index.css';
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+  useMutation,
+} from "@tanstack/react-query";
+import {
+  Link,
+  Route,
+  Switch,
+  Router as WouterRouter,
+  useLocation,
+  useParams,
+  useRoute,
+} from "wouter";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  BookOpen,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  CircleAlert,
+  ClipboardList,
+  Copy,
+  FileText,
+  Gavel,
+  HeartHandshake,
+  Info,
+  Landmark,
+  LayoutDashboard,
+  LifeBuoy,
+  LogOut,
+  Menu,
+  MessageCircleQuestion,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  Users,
+  X,
+  Upload,
+  Scale,
+  CalendarPlus,
+  CheckCircle2,
+  UserSearch,
+} from "lucide-react";
+import {
+  getGetAwarenessQueryKey,
+  getGetCaseQueryKey,
+  getGetDashboardSummaryQueryKey,
+  getGetLawyerQueryKey,
+  getGetMeQueryKey,
+  getListAwarenessQueryKey,
+  getListCasesQueryKey,
+  getListComplaintsQueryKey,
+  getListDocumentsQueryKey,
+  getListHearingsQueryKey,
+  getListLawyersQueryKey,
+  getListNotificationsQueryKey,
+  getListQuestionsQueryKey,
+  getListUsersQueryKey,
+  useCreateAwareness,
+  useCreateCase,
+  useCreateComplaint,
+  useCreateDocument,
+  useCreateHearing,
+  useCreateLawyer,
+  useCreateQuestion,
+  useDeleteAwareness,
+  useGetAwareness,
+  useGetCase,
+  useGetDashboardSummary,
+  useGetLawyer,
+  useGetMe,
+  useHealthCheck,
+  useListAwareness,
+  useListUsers,
+  useListCases,
+  useListComplaints,
+  useListDocuments,
+  useListHearings,
+  useListCaseMessages,
+  useCreateCaseMessage,
+  getListCaseMessagesQueryKey,
+  useListLawyers,
+  useListNotifications,
+  useListQuestions,
+  useLogin,
+  useMarkNotificationRead,
+  useRegister,
+  useRespondToQuestion,
+  useUpdateAwareness,
+  useUpdateCase,
+  useUpdateComplaint,
+  useUpdateHearing,
+  useUpdateLawyer,
+  useUpdateUser,
+  useVerifyLawyer,
+  useListAppointments,
+  useCreateAppointment,
+  useUpdateAppointmentStatus,
+  getListAppointmentsQueryKey,
+  setAuthTokenGetter,
+} from "@workspace/api-client-react";
+import type { Case, Lawyer, AppointmentOrder } from "@workspace/api-client-react";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import NotFound from "@/pages/not-found";
+import { commonRights, simpleTerms, translate, type AppLanguage } from "./i18n";
+import "./index.css";
 
-const queryClient = new QueryClient();
-const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(' ');
-const fmt = (date?: string | null) => date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not scheduled';
-const tokenKey = 'justice-connect-token';
-const userKey = 'justice-connect-user';
-setAuthTokenGetter(() => typeof window === 'undefined' ? null : localStorage.getItem(tokenKey));
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes cache: instant switching between features
+      gcTime: 1000 * 60 * 15,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      retry: 1,
+    },
+  },
+});
+const cx = (...parts: (string | false | undefined)[]) =>
+  parts.filter(Boolean).join(" ");
+const fmt = (date?: string | null) =>
+  date
+    ? new Date(date).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "Not scheduled";
+const tokenKey = "justice-connect-token";
+const userKey = "justice-connect-user";
+setAuthTokenGetter(() =>
+  typeof window === "undefined" ? null : localStorage.getItem(tokenKey),
+);
 
 const LanguageContext = createContext<{
   language: AppLanguage;
   setLanguage: (language: AppLanguage) => void;
-}>({ language: 'English', setLanguage: () => undefined });
+}>({ language: "English", setLanguage: () => undefined });
 
 function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<AppLanguage>(() => {
-    const saved = typeof window === 'undefined' ? 'English' : localStorage.getItem('justice-connect-language');
-    return saved === 'Tamil' ? 'Tamil' : 'English';
+    const saved =
+      typeof window === "undefined"
+        ? "English"
+        : localStorage.getItem("justice-connect-language");
+    return saved === "Tamil" ? "Tamil" : "English";
   });
   useEffect(() => {
-    document.documentElement.lang = language === 'Tamil' ? 'ta' : 'en';
-    localStorage.setItem('justice-connect-language', language);
+    document.documentElement.lang = language === "Tamil" ? "ta" : "en";
+    localStorage.setItem("justice-connect-language", language);
   }, [language]);
-  return <LanguageContext.Provider value={{ language, setLanguage }}>{children}</LanguageContext.Provider>;
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage }}>
+      {children}
+    </LanguageContext.Provider>
+  );
 }
 
 function useLanguage() {
@@ -61,268 +193,4719 @@ function useCopy() {
   return (text: string) => translate(text, language);
 }
 
-function Button({ children, className, variant = 'primary', ...props }: any) {
+function Button({ children, className, variant = "primary", ...props }: any) {
   const variants: Record<string, string> = {
-    primary: 'bg-primary text-primary-foreground hover:opacity-90 shadow-sm',
-    secondary: 'bg-secondary text-secondary-foreground hover:bg-accent/35',
-    outline: 'border border-border bg-card text-foreground hover:border-primary/50 hover:bg-secondary/45',
-    quiet: 'text-muted-foreground hover:text-foreground hover:bg-secondary/55',
-    danger: 'bg-destructive text-destructive-foreground hover:opacity-90',
+    primary: "bg-primary text-primary-foreground hover:opacity-90 shadow-sm",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-accent/35",
+    outline:
+      "border border-border bg-card text-foreground hover:border-primary/50 hover:bg-secondary/45",
+    quiet: "text-muted-foreground hover:text-foreground hover:bg-secondary/55",
+    danger: "bg-destructive text-destructive-foreground hover:opacity-90",
   };
-  return <button className={cx('inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50', variants[variant], className)} {...props}>{children}</button>;
+  return (
+    <button
+      className={cx(
+        "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50",
+        variants[variant],
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
 }
 
-function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: string }) {
-  const tones: Record<string, string> = { neutral: 'bg-secondary text-secondary-foreground', good: 'bg-[#d9eee4] text-[#246047]', warn: 'bg-[#f7e7c2] text-[#795a17]', alert: 'bg-[#f8dbd4] text-[#8d372d]', blue: 'bg-[#dbe9eb] text-[#255c67]' };
-  return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide', tones[tone] || tones.neutral)}>{children}</span>;
+function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: string;
+}) {
+  const tones: Record<string, string> = {
+    neutral: "bg-secondary text-secondary-foreground",
+    good: "bg-[#d9eee4] text-[#246047]",
+    warn: "bg-[#f7e7c2] text-[#795a17]",
+    alert: "bg-[#f8dbd4] text-[#8d372d]",
+    blue: "bg-[#dbe9eb] text-[#255c67]",
+  };
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide",
+        tones[tone] || tones.neutral,
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
-function Card({ children, className = '', ...props }: any) {
-  return <div className={cx('rounded-2xl border border-card-border bg-card shadow-[0_10px_30px_hsl(var(--primary)/.035)]', className)} {...props}>{children}</div>;
+function Card({ children, className = "", ...props }: any) {
+  return (
+    <div
+      className={cx(
+        "rounded-2xl border border-card-border bg-card shadow-[0_10px_30px_hsl(var(--primary)/.035)]",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
 }
 
 function Field({ label, ...props }: any) {
-  return <label className="grid gap-1.5 text-sm font-semibold text-foreground">{label}<input className="h-11 rounded-xl border border-input bg-background px-3.5 font-normal outline-none placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-accent/25" {...props} /></label>;
+  return (
+    <label className="grid gap-1.5 text-sm font-semibold text-foreground">
+      {label}
+      <input
+        className="h-11 rounded-xl border border-input bg-background px-3.5 font-normal outline-none placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-accent/25"
+        {...props}
+      />
+    </label>
+  );
 }
 
 function TextField({ label, ...props }: any) {
-  return <label className="grid gap-1.5 text-sm font-semibold text-foreground">{label}<textarea className="min-h-28 resize-y rounded-xl border border-input bg-background px-3.5 py-3 font-normal outline-none placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-accent/25" {...props} /></label>;
+  return (
+    <label className="grid gap-1.5 text-sm font-semibold text-foreground">
+      {label}
+      <textarea
+        className="min-h-28 resize-y rounded-xl border border-input bg-background px-3.5 py-3 font-normal outline-none placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-accent/25"
+        {...props}
+      />
+    </label>
+  );
 }
 
-function Skeleton({ className = '' }: { className?: string }) { return <div className={cx('animate-pulse rounded-lg bg-secondary', className)} />; }
+function Skeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={cx("animate-pulse rounded-lg bg-secondary", className)} />
+  );
+}
 function Empty({ icon: Icon = FileText, title, message, action }: any) {
   const t = useCopy();
-  return <Card className="flex flex-col items-center justify-center px-6 py-14 text-center"><div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-primary"><Icon size={25} /></div><h3 className="jc-serif text-lg font-bold">{t(title)}</h3><p className="mt-1 max-w-sm text-sm text-muted-foreground">{t(message)}</p>{action && <div className="mt-5">{action}</div>}</Card>;
+  return (
+    <Card className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-primary">
+        <Icon size={25} />
+      </div>
+      <h3 className="jc-serif text-lg font-bold">{t(title)}</h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        {t(message)}
+      </p>
+      {action && <div className="mt-5">{action}</div>}
+    </Card>
+  );
 }
-function ErrorState({ message = 'We could not load this sample data.' }: { message?: string }) {
-  return <Card className="flex items-center gap-3 border-[#d4a64e]/45 bg-[#f7e7c2]/45 p-5 text-sm text-[#795a17]"><AlertTriangle size={19} className="shrink-0" /><span>{message} Try refreshing this view.</span></Card>;
+function ErrorState({
+  message = "We could not load this sample data.",
+}: {
+  message?: string;
+}) {
+  return (
+    <Card className="flex items-center gap-3 border-[#d4a64e]/45 bg-[#f7e7c2]/45 p-5 text-sm text-[#795a17]">
+      <AlertTriangle size={19} className="shrink-0" />
+      <span>{message} Try refreshing this view.</span>
+    </Card>
+  );
 }
-function Loading({ rows = 3 }: { rows?: number }) { return <div className="grid gap-3">{Array.from({ length: rows }, (_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>; }
-function PrototypeNote() { const t = useCopy(); return <><div className="mt-8 flex items-start gap-2 border-t border-border/70 pt-4 text-xs leading-5 text-muted-foreground"><Info size={15} className="mt-0.5 shrink-0 text-accent" />{t('Justice Connect is an academic/demo prototype using fictional sample data. It does not provide legal advice, predict outcomes, connect to real courts, or create a lawyer-client relationship.')}</div><div className="mt-5 grid gap-5 lg:grid-cols-2"><HearingReminder /><VoiceDemo /></div></>; }
+function Loading({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="grid gap-3">
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton key={i} className="h-20 w-full" />
+      ))}
+    </div>
+  );
+}
+function PrototypeNote() {
+  const t = useCopy();
+  return (
+    <>
+      <div className="mt-8 flex items-start gap-2 border-t border-border/70 pt-4 text-xs leading-5 text-muted-foreground">
+        <Info size={15} className="mt-0.5 shrink-0 text-accent" />
+        {t(
+          "Justice Connect is an academic/demo prototype using fictional sample data. It does not provide legal advice, predict outcomes, connect to real courts, or create a lawyer-client relationship.",
+        )}
+      </div>
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <HearingReminder />
+        <VoiceDemo />
+      </div>
+    </>
+  );
+}
 
-const navByRole: Record<string, { href: string; label: string; icon: any }[]> = {
-  citizen: [
-    { href: '/citizen', label: 'Overview', icon: LayoutDashboard }, { href: '/citizen/cases', label: 'My cases', icon: BriefcaseBusiness },
-    { href: '/citizen/documents', label: 'Documents', icon: FileText }, { href: '/citizen/lawyers', label: 'Find a lawyer', icon: Scale },
-    { href: '/citizen/questions', label: 'Ask a lawyer', icon: MessageCircleQuestion }, { href: '/citizen/complaints', label: 'Raise your voice', icon: CircleAlert },
-    { href: '/citizen/awareness', label: 'Know your rights', icon: BookOpen },
-  ],
-  lawyer: [
-    { href: '/lawyer', label: 'Overview', icon: LayoutDashboard }, { href: '/lawyer/cases', label: 'Assigned cases', icon: BriefcaseBusiness },
-    { href: '/lawyer/questions', label: 'Questions', icon: MessageCircleQuestion }, { href: '/lawyer/profile', label: 'My profile', icon: UserRound },
-  ],
-  admin: [
-    { href: '/admin', label: 'Overview', icon: LayoutDashboard }, { href: '/admin/users', label: 'Users', icon: Users },
-    { href: '/admin/lawyers', label: 'Lawyers', icon: Scale }, { href: '/admin/cases', label: 'Cases & hearings', icon: Gavel },
-    { href: '/admin/complaints', label: 'Complaints', icon: CircleAlert }, { href: '/admin/awareness', label: 'Awareness', icon: BookOpen },
-    { href: '/admin/updates', label: 'Updates', icon: Bell },
-  ],
-};
+const navByRole: Record<string, { href: string; label: string; icon: any }[]> =
+  {
+    citizen: [
+      { href: "/citizen", label: "Overview", icon: LayoutDashboard },
+      { href: "/citizen/cases", label: "My cases", icon: BriefcaseBusiness },
+      { href: "/citizen/submit-case", label: "Submit a case", icon: Plus },
+      { href: "/citizen/documents", label: "Documents", icon: FileText },
+      { href: "/citizen/assistant", label: "AI Assistant", icon: Sparkles },
+      { href: "/citizen/lawyers", label: "Find a lawyer", icon: Scale },
+      {
+        href: "/citizen/questions",
+        label: "Ask a lawyer",
+        icon: MessageCircleQuestion,
+      },
+      {
+        href: "/citizen/complaints",
+        label: "Raise your voice",
+        icon: CircleAlert,
+      },
+      { href: "/citizen/awareness", label: "Know your rights", icon: BookOpen },
+    ],
+    lawyer: [
+      { href: "/lawyer", label: "Overview", icon: LayoutDashboard },
+      {
+        href: "/lawyer/appointments",
+        label: "Appointments",
+        icon: BriefcaseBusiness,
+      },
+      {
+        href: "/lawyer/cases",
+        label: "Assigned cases",
+        icon: BriefcaseBusiness,
+      },
+      {
+        href: "/lawyer/questions",
+        label: "Questions",
+        icon: MessageCircleQuestion,
+      },
+      { href: "/lawyer/assistant", label: "AI Assistant", icon: Sparkles },
+      { href: "/lawyer/profile", label: "My profile", icon: UserRound },
+    ],
+    admin: [
+      { href: "/admin", label: "Overview", icon: LayoutDashboard },
+      { href: "/admin/users", label: "Users", icon: Users },
+      { href: "/admin/lawyers", label: "Lawyers", icon: Scale },
+      { href: "/admin/cases", label: "Cases & hearings", icon: Gavel },
+      { href: "/admin/complaints", label: "Complaints", icon: CircleAlert },
+      { href: "/admin/awareness", label: "Awareness", icon: BookOpen },
+      { href: "/admin/updates", label: "Updates", icon: Bell },
+    ],
+  };
 
 const tamilNavLabels: Record<string, string> = {
-  Overview: 'மேலோட்டம்', 'My cases': 'என் வழக்குகள்', Documents: 'ஆவணங்கள்',
-  'Find a lawyer': 'வழக்கறிஞரைத் தேடுங்கள்', 'Ask a lawyer': 'வழக்கறிஞரிடம் கேளுங்கள்',
-  'Raise your voice': 'உங்கள் குரலைப் பதிவு செய்யுங்கள்', 'Know your rights': 'உங்கள் உரிமைகளை அறியுங்கள்',
-  'Assigned cases': 'ஒதுக்கப்பட்ட வழக்குகள்', Questions: 'கேள்விகள்', 'My profile': 'என் சுயவிவரம்',
-  Users: 'பயனர்கள்', Lawyers: 'வழக்கறிஞர்கள்', 'Cases & hearings': 'வழக்குகள் மற்றும் விசாரணைகள்',
-  Complaints: 'புகார்கள்', Awareness: 'விழிப்புணர்வு', Updates: 'புதுப்பிப்புகள்',
+  Overview: "மேலோட்டம்",
+  "My cases": "என் வழக்குகள்",
+  Documents: "ஆவணங்கள்",
+  "Find a lawyer": "வழக்கறிஞரைத் தேடுங்கள்",
+  "Ask a lawyer": "வழக்கறிஞரிடம் கேளுங்கள்",
+  "Raise your voice": "உங்கள் குரலைப் பதிவு செய்யுங்கள்",
+  "Know your rights": "உங்கள் உரிமைகளை அறியுங்கள்",
+  Appointments: "நியமனங்கள்",
+  "Assigned cases": "ஒதுக்கப்பட்ட வழக்குகள்",
+  Questions: "கேள்விகள்",
+  "AI Assistant": "AI உதவியாளர்",
+  "My profile": "என் சுயவிவரம்",
+  Users: "பயனர்கள்",
+  Lawyers: "வழக்கறிஞர்கள்",
+  "Cases & hearings": "வழக்குகள் மற்றும் விசாரணைகள்",
+  Complaints: "புகார்கள்",
+  Awareness: "விழிப்புணர்வு",
+  Updates: "புதுப்பிப்புகள்",
 };
 
 function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
   const t = useCopy();
-  return <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground" title={t('Choose interface language')}>
-    <span className="hidden sm:inline">{t('Language')}</span>
-    <select value={language} onChange={e => setLanguage(e.target.value as AppLanguage)} className="h-9 rounded-lg border border-border bg-card px-2 text-xs text-foreground outline-none focus:border-accent" aria-label={t('Language')}>
-      <option value="English">{t('English')}</option><option value="Tamil">{t('Tamil')}</option>
-    </select>
-  </label>;
+  return (
+    <label
+      className="flex items-center gap-2 text-xs font-bold text-muted-foreground"
+      title={t("Choose interface language")}
+    >
+      <span className="hidden sm:inline">{t("Language")}</span>
+      <select
+        value={language}
+        onChange={(e) => setLanguage(e.target.value as AppLanguage)}
+        className="h-9 rounded-lg border border-border bg-card px-2 text-xs text-foreground outline-none focus:border-accent"
+        aria-label={t("Language")}
+      >
+        <option value="English">{t("English")}</option>
+        <option value="Tamil">{t("Tamil")}</option>
+      </select>
+    </label>
+  );
 }
 
 function Shell({ role, children }: { role: string; children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
-  const stored = useMemo(() => { try { return JSON.parse(localStorage.getItem(userKey) || '{}'); } catch { return {}; } }, []);
+  const stored = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem(userKey) || "{}");
+    } catch {
+      return {};
+    }
+  }, []);
   const nav = navByRole[role] || navByRole.citizen;
   const t = useCopy();
   const { language } = useLanguage();
-  const signOut = () => { localStorage.removeItem(tokenKey); localStorage.removeItem(userKey); setLocation('/'); };
-  return <div className="jc-noise min-h-[100dvh] bg-background text-foreground md:flex">
-    <aside className={cx('fixed inset-y-0 left-0 z-40 flex w-[270px] -translate-x-full flex-col border-r border-sidebar-border bg-sidebar px-4 py-5 text-sidebar-foreground transition-transform md:static md:translate-x-0', open && 'translate-x-0')}>
-      <div className="flex items-center justify-between px-3 pb-7"><Link href="/" className="flex items-center gap-3" data-testid="link-brand"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary shadow-[4px_4px_0_hsl(var(--accent)/.2)]"><Landmark size={20} /></span><span><strong className="block font-serif text-lg leading-tight">Justice<br /><i className="font-normal">Connect</i></strong></span></Link><button className="rounded-lg p-2 hover:bg-sidebar-accent md:hidden" onClick={() => setOpen(false)} data-testid="button-close-menu"><X size={18} /></button></div>
-       <div className="mb-5 rounded-xl bg-sidebar-accent/70 px-3 py-3 text-xs text-sidebar-foreground/70"><span className="jc-mono text-[10px] uppercase tracking-[.18em] text-sidebar-primary">{t('Workspace')}</span><div className="mt-1 font-semibold text-sidebar-foreground">{t(role === 'citizen' ? 'Your civic record' : role === 'lawyer' ? 'Practice desk' : 'Steward console')}</div></div>
-       <nav className="grid gap-1">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setOpen(false)} className={cx('group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground', location === href || (href !== `/${role}` && location.startsWith(`${href}/`)) ? 'bg-sidebar-accent text-sidebar-foreground shadow-inner' : '')} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} className={location === href ? 'text-sidebar-primary' : ''} />{t(label)}{location === href && <ChevronRight size={14} className="ml-auto text-sidebar-primary" />}</Link>)}</nav>
-       <div className="mt-auto grid gap-1 border-t border-sidebar-border pt-4"><Link href="/citizen/explainer" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-sidebar-foreground/75 hover:bg-sidebar-accent" data-testid="link-explainer"><Sparkles size={17} />{t('Document explainer')}</Link><button onClick={signOut} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-sidebar-foreground/75 hover:bg-sidebar-accent" data-testid="button-sign-out"><LogOut size={17} />{t('Sign out')}</button></div>
-    </aside>
-    {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-primary/25 md:hidden" onClick={() => setOpen(false)} data-testid="button-dismiss-menu" />}
-     <main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex min-h-[72px] items-center justify-between gap-3 border-b border-border/70 bg-background/90 px-5 py-2 backdrop-blur md:px-10"><div className="flex items-center gap-3"><button className="rounded-xl border border-border p-2 md:hidden" onClick={() => setOpen(true)} data-testid="button-open-menu"><Menu size={19} /></button><div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex"><span className="h-2 w-2 rounded-full bg-[#4c9a72]" />{t('Prototype workspace')}</div></div><div className="flex items-center gap-3"><LanguageSwitcher /><Link href={role === 'admin' ? '/admin/updates' : `/${role}`} className="relative rounded-xl p-2.5 text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label={t('Notifications')} data-testid="button-notifications"><Bell size={19} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" /></Link><div className="hidden h-8 w-px bg-border sm:block" /><div className="flex items-center gap-2"><div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{(stored.name || role).slice(0, 2).toUpperCase()}</div><div className="hidden text-left sm:block"><div className="text-sm font-bold">{stored.name || `${role[0].toUpperCase()}${role.slice(1)}`}</div><div className="text-[11px] capitalize text-muted-foreground">{t('account')}</div></div></div></div></header><div className="mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">{children}</div></main>
-  </div>;
+  const signOut = () => {
+    localStorage.removeItem(tokenKey);
+    localStorage.removeItem(userKey);
+    setLocation("/");
+  };
+  return (
+    <div className="jc-noise min-h-[100dvh] bg-background text-foreground md:flex">
+      <aside
+        className={cx(
+          "fixed inset-y-0 left-0 z-40 flex w-[270px] -translate-x-full flex-col border-r border-sidebar-border bg-sidebar px-4 py-5 text-sidebar-foreground transition-transform md:static md:translate-x-0",
+          open && "translate-x-0",
+        )}
+      >
+        <div className="flex items-center justify-between px-3 pb-7">
+          <Link
+            href="/"
+            className="flex items-center gap-3"
+            data-testid="link-brand"
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary shadow-[4px_4px_0_hsl(var(--accent)/.2)]">
+              <Landmark size={20} />
+            </span>
+            <span>
+              <strong className="block font-serif text-lg leading-tight">
+                Justice
+                <br />
+                <i className="font-normal">Connect</i>
+              </strong>
+            </span>
+          </Link>
+          <button
+            className="rounded-lg p-2 hover:bg-sidebar-accent md:hidden"
+            onClick={() => setOpen(false)}
+            data-testid="button-close-menu"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="mb-5 rounded-xl bg-sidebar-accent/70 px-3 py-3 text-xs text-sidebar-foreground/70">
+          <span className="jc-mono text-[10px] uppercase tracking-[.18em] text-sidebar-primary">
+            {t("Workspace")}
+          </span>
+          <div className="mt-1 font-semibold text-sidebar-foreground">
+            {t(
+              role === "citizen"
+                ? "Your civic record"
+                : role === "lawyer"
+                  ? "Practice desk"
+                  : "Steward console",
+            )}
+          </div>
+        </div>
+        <nav className="grid gap-1">
+          {nav.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setOpen(false)}
+              className={cx(
+                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                location === href ||
+                  (href !== `/${role}` && location.startsWith(`${href}/`))
+                  ? "bg-sidebar-accent text-sidebar-foreground shadow-inner"
+                  : "",
+              )}
+              data-testid={`link-nav-${label.toLowerCase().replaceAll(" ", "-")}`}
+            >
+              <Icon
+                size={17}
+                className={location === href ? "text-sidebar-primary" : ""}
+              />
+              {t(label)}
+              {location === href && (
+                <ChevronRight
+                  size={14}
+                  className="ml-auto text-sidebar-primary"
+                />
+              )}
+            </Link>
+          ))}
+        </nav>
+        <div className="mt-auto grid gap-1 border-t border-sidebar-border pt-4">
+          <Link
+            href="/citizen/explainer"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-sidebar-foreground/75 hover:bg-sidebar-accent"
+            data-testid="link-explainer"
+          >
+            <Sparkles size={17} />
+            {t("Document explainer")}
+          </Link>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-sidebar-foreground/75 hover:bg-sidebar-accent"
+            data-testid="button-sign-out"
+          >
+            <LogOut size={17} />
+            {t("Sign out")}
+          </button>
+        </div>
+      </aside>
+      {open && (
+        <button
+          aria-label="Close navigation"
+          className="fixed inset-0 z-30 bg-primary/25 md:hidden"
+          onClick={() => setOpen(false)}
+          data-testid="button-dismiss-menu"
+        />
+      )}
+      <main className="min-w-0 flex-1">
+        <header className="sticky top-0 z-20 flex min-h-[72px] items-center justify-between gap-3 border-b border-border/70 bg-background/90 px-5 py-2 backdrop-blur md:px-10">
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-xl border border-border p-2 md:hidden"
+              onClick={() => setOpen(true)}
+              data-testid="button-open-menu"
+            >
+              <Menu size={19} />
+            </button>
+            <div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex">
+              <span className="h-2 w-2 rounded-full bg-[#4c9a72]" />
+              {t("Prototype workspace")}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Link
+              href={role === "admin" ? "/admin/updates" : `/${role}`}
+              className="relative rounded-xl p-2.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label={t("Notifications")}
+              data-testid="button-notifications"
+            >
+              <Bell size={19} />
+              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+            </Link>
+            <div className="hidden h-8 w-px bg-border sm:block" />
+            <div className="flex items-center gap-2">
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {(stored.name || role).slice(0, 2).toUpperCase()}
+              </div>
+              <div className="hidden text-left sm:block">
+                <div className="text-sm font-bold">
+                  {stored.name || `${role[0].toUpperCase()}${role.slice(1)}`}
+                </div>
+                <div className="text-[11px] capitalize text-muted-foreground">
+                  {t("account")}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
 }
 
 function Protected({ role, children }: { role: string; children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const hasToken = Boolean(localStorage.getItem(tokenKey));
-  const me = useGetMe({ query: { queryKey: getGetMeQueryKey(), enabled: hasToken } });
-  useEffect(() => { if (!hasToken && location !== '/sign-in') setLocation('/sign-in'); }, [hasToken, location, setLocation]);
+  const me = useGetMe({
+    query: { queryKey: getGetMeQueryKey(), enabled: hasToken },
+  });
+  useEffect(() => {
+    if (!hasToken && location !== "/sign-in") setLocation("/sign-in");
+  }, [hasToken, location, setLocation]);
   if (!hasToken) return null;
-  const actual = me.data?.role || (() => { try { return JSON.parse(localStorage.getItem(userKey) || '{}').role; } catch { return ''; } })();
-  if (actual && actual !== role) return <Shell role={actual}><AccessDenied /></Shell>;
+  const actual =
+    me.data?.role ||
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(userKey) || "{}").role;
+      } catch {
+        return "";
+      }
+    })();
+  if (actual && actual !== role)
+    return (
+      <Shell role={actual}>
+        <AccessDenied />
+      </Shell>
+    );
   return <Shell role={role}>{children}</Shell>;
 }
 
-function AccessDenied() { return <div className="mx-auto max-w-xl py-24 text-center"><ShieldCheck size={40} className="mx-auto text-accent" /><h1 className="jc-serif mt-5 text-3xl font-bold">That space is protected</h1><p className="mt-2 text-muted-foreground">Your current demo role does not have access to this workspace.</p><Link href="/" className="mt-6 inline-flex text-sm font-bold text-primary underline underline-offset-4" data-testid="link-access-home">Return home</Link></div>; }
+function AccessDenied() {
+  return (
+    <div className="mx-auto max-w-xl py-24 text-center">
+      <ShieldCheck size={40} className="mx-auto text-accent" />
+      <h1 className="jc-serif mt-5 text-3xl font-bold">
+        Unauthorized
+      </h1>
+      <p className="mt-2 text-muted-foreground">
+        You are not authorized to access this page.
+      </p>
+      <Link
+        href="/"
+        className="mt-6 inline-flex text-sm font-bold text-primary underline underline-offset-4"
+        data-testid="link-access-home"
+      >
+        Return home
+      </Link>
+    </div>
+  );
+}
 
-function PublicHeader() { const t = useCopy(); return <><PrototypeBanner /><header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 md:px-8"><Link href="/" className="flex items-center gap-3" data-testid="link-public-brand"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary"><Landmark size={20} /></span><span className="font-serif text-lg font-bold leading-none text-primary">Justice<br /><i className="font-normal">Connect</i></span></Link><div className="flex items-center gap-2"><LanguageSwitcher /><Link href="/sign-in" className="rounded-xl px-3 py-2 text-sm font-bold text-primary hover:bg-primary/5" data-testid="link-sign-in">{t('Sign in')}</Link><Link href="/sign-up" className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:opacity-90" data-testid="link-sign-up">{t('Create account')} <ArrowRight size={15} className="ml-1 inline" /></Link></div></header></>; }
-function PrototypeBanner() { const t = useCopy(); return <div className="relative z-10 border-y border-[#d4a64e]/35 bg-[#f7e7c2] px-5 py-3 text-center text-xs font-bold text-[#795a17]">{t('SAMPLE DATA – ACADEMIC PROTOTYPE · No legal advice, real court connections, or real-world lawyer verification')}</div>; }
+function PublicHeader() {
+  const t = useCopy();
+  return (
+    <>
+      <PrototypeBanner />
+      <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 md:px-8">
+        <Link
+          href="/"
+          className="flex items-center gap-3"
+          data-testid="link-public-brand"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary">
+            <Landmark size={20} />
+          </span>
+          <span className="font-serif text-lg font-bold leading-none text-primary">
+            Justice
+            <br />
+            <i className="font-normal">Connect</i>
+          </span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <Link
+            href="/sign-in"
+            className="rounded-xl px-3 py-2 text-sm font-bold text-primary hover:bg-primary/5"
+            data-testid="link-sign-in"
+          >
+            {t("Sign in")}
+          </Link>
+          <Link
+            href="/sign-up"
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:opacity-90"
+            data-testid="link-sign-up"
+          >
+            {t("Create account")}{" "}
+            <ArrowRight size={15} className="ml-1 inline" />
+          </Link>
+        </div>
+      </header>
+    </>
+  );
+}
+function PrototypeBanner() {
+  const t = useCopy();
+  return (
+    <div className="relative z-10 border-y border-[#d4a64e]/35 bg-[#f7e7c2] px-5 py-3 text-center text-xs font-bold text-[#795a17]">
+      {t(
+        "SAMPLE DATA – ACADEMIC PROTOTYPE · No legal advice, real court connections, or real-world lawyer verification",
+      )}
+    </div>
+  );
+}
 
 function LegacyHome() {
   useHealthCheck();
-  return <div className="jc-noise min-h-[100dvh] bg-background text-foreground"><PublicHeader /><section className="relative overflow-hidden border-b border-border bg-[#e8efe9]"><div className="jc-grid absolute inset-0 opacity-70" /><div className="relative mx-auto grid min-h-[660px] max-w-7xl items-center gap-14 px-5 pb-20 pt-32 md:grid-cols-[1.15fr_.85fr] md:px-8 md:pt-28"><div className="jc-rise max-w-2xl"><Badge tone="blue"><HeartHandshake size={13} />A calmer way forward</Badge><h1 className="jc-serif mt-6 text-[clamp(3.4rem,7vw,6.6rem)] font-bold leading-[.98] tracking-[-.055em] text-primary">Make sense<br /><span className="text-[#3e8b73]">of what comes next.</span></h1><p className="mt-7 max-w-xl text-lg leading-8 text-primary/70">Justice Connect helps you understand a confusing case, keep important records close, and find a clear next step — without the intimidating legal maze.</p><div className="mt-9 flex flex-wrap gap-3"><Link href="/sign-up" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-bold text-primary-foreground hover:-translate-y-0.5" data-testid="link-hero-start">Start with your case <ArrowRight size={17} /></Link><Link href="/sign-in" className="inline-flex h-12 items-center rounded-xl border border-primary/20 bg-background/50 px-5 font-bold text-primary hover:bg-background" data-testid="link-hero-demo">Use a demo account</Link></div><div className="mt-11 flex items-center gap-5 text-xs font-bold text-primary/55"><span className="flex items-center gap-2"><ShieldCheck size={16} />Plain-language guidance</span><span className="flex items-center gap-2"><LockIcon />Private by design</span></div></div><div className="jc-rise relative mx-auto w-full max-w-[430px]" style={{ animationDelay: '.12s' }}><div className="absolute -inset-8 rounded-full bg-[#c7ded2]/60 blur-3xl" /><Card className="relative rotate-[2deg] overflow-hidden border-primary/10 bg-[#fbf7ec] p-5 shadow-[18px_22px_0_hsl(var(--primary)/.08)]"><div className="flex items-center justify-between border-b border-primary/10 pb-4"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-primary/50">Case companion</div><div className="mt-1 font-serif text-lg font-bold text-primary">Your case, in one place</div></div><div className="grid h-9 w-9 place-items-center rounded-lg bg-[#dcebe3] text-[#3e8b73]"><ClipboardList size={18} /></div></div><div className="mt-5 rounded-xl bg-[#e7f1eb] p-4"><div className="flex justify-between text-xs font-bold text-primary/60"><span>CASE JC-2024-0187</span><span className="text-[#3e8b73]">Active</span></div><div className="mt-2 font-serif text-lg font-bold text-primary">Property boundary review</div><div className="mt-4 h-2 overflow-hidden rounded-full bg-primary/10"><div className="h-full w-[68%] rounded-full bg-[#4c9a72]" /></div><div className="mt-2 flex justify-between text-[11px] text-primary/55"><span>Filed 14 Feb 2024</span><span>68% organized</span></div></div><div className="mt-4 grid gap-2"><div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3"><div className="grid h-8 w-8 place-items-center rounded-lg bg-[#f7e7c2] text-[#795a17]"><CalendarDays size={15} /></div><div className="text-xs"><b className="block text-primary">Next hearing</b><span className="text-primary/55">12 September · District Court</span></div><ChevronRight size={15} className="ml-auto text-primary/35" /></div><div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3"><div className="grid h-8 w-8 place-items-center rounded-lg bg-[#dbe9eb] text-[#255c67]"><FileText size={15} /></div><div className="text-xs"><b className="block text-primary">2 documents explained</b><span className="text-primary/55">Last updated yesterday</span></div><ChevronRight size={15} className="ml-auto text-primary/35" /></div></div><div className="mt-5 flex items-center gap-2 border-t border-primary/10 pt-4 text-xs text-primary/55"><Sparkles size={14} className="text-[#c38d3e]" /> A small step is still a step.</div></Card></div></div></section><section className="mx-auto max-w-7xl px-5 py-20 md:px-8"><div className="grid gap-12 md:grid-cols-[.8fr_1.2fr]"><div><div className="jc-mono text-xs font-bold uppercase tracking-[.18em] text-[#3e8b73]">A public-service companion</div><h2 className="jc-serif mt-4 max-w-md text-4xl font-bold leading-tight text-primary">Less legal fog.<br />More footing.</h2></div><div className="grid gap-8 sm:grid-cols-3"><Feature icon={BookOpen} number="01" title="Understand" text="Translate formal documents into a plain-language starting point." /><Feature icon={ClipboardList} number="02" title="Organize" text="Keep case details, hearings, and records together." /><Feature icon={Users} number="03" title="Connect" text="Find a fictional sample lawyer or ask your next question." /></div></div></section><section className="bg-primary text-primary-foreground"><div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 md:grid-cols-[1fr_.8fr] md:px-8"><div><div className="jc-mono text-xs uppercase tracking-[.18em] text-accent">Built for the real moment</div><h2 className="jc-serif mt-4 max-w-2xl text-4xl font-bold leading-tight md:text-5xl">When a letter arrives and you do not know where to begin.</h2><p className="mt-5 max-w-xl leading-7 text-primary-foreground/65">Start with the piece in front of you. See what it says, what it does not say, and which question is worth asking next.</p></div><div className="grid gap-3 self-center"><Quote text="I finally understood which date mattered." label="A citizen's first step" /><Quote text="The overview gives me enough context to help." label="A lawyer's working view" /></div></div></section><section className="mx-auto max-w-7xl px-5 py-16 md:px-8"><div className="flex flex-col justify-between gap-6 border-b border-border pb-8 sm:flex-row sm:items-end"><div><div className="jc-mono text-xs uppercase tracking-[.18em] text-[#3e8b73]">Start here</div><h2 className="jc-serif mt-3 text-3xl font-bold text-primary">A clearer next step is close.</h2></div><Link href="/sign-up" className="inline-flex items-center gap-2 text-sm font-bold text-primary underline decoration-accent decoration-2 underline-offset-4" data-testid="link-final-start">Create your free demo account <ArrowRight size={15} /></Link></div><div className="mt-8 flex flex-wrap gap-3 text-sm text-muted-foreground"><span className="rounded-full bg-secondary px-4 py-2">No OTP or social login</span><span className="rounded-full bg-secondary px-4 py-2">Fictional sample accounts</span><span className="rounded-full bg-secondary px-4 py-2">Academic prototype</span></div></section><footer className="border-t border-border px-5 py-7 text-center text-xs text-muted-foreground">Justice Connect · An academic civic-tech prototype · Not legal advice</footer></div>;
+  return (
+    <div className="jc-noise min-h-[100dvh] bg-background text-foreground">
+      <PublicHeader />
+      <section className="relative overflow-hidden border-b border-border bg-[#e8efe9]">
+        <div className="jc-grid absolute inset-0 opacity-70" />
+        <div className="relative mx-auto grid min-h-[660px] max-w-7xl items-center gap-14 px-5 pb-20 pt-32 md:grid-cols-[1.15fr_.85fr] md:px-8 md:pt-28">
+          <div className="jc-rise max-w-2xl">
+            <Badge tone="blue">
+              <HeartHandshake size={13} />A calmer way forward
+            </Badge>
+            <h1 className="jc-serif mt-6 text-[clamp(3.4rem,7vw,6.6rem)] font-bold leading-[.98] tracking-[-.055em] text-primary">
+              Make sense
+              <br />
+              <span className="text-[#3e8b73]">of what comes next.</span>
+            </h1>
+            <p className="mt-7 max-w-xl text-lg leading-8 text-primary/70">
+              Justice Connect helps you understand a confusing case, keep
+              important records close, and find a clear next step — without the
+              intimidating legal maze.
+            </p>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link
+                href="/sign-up"
+                className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-bold text-primary-foreground hover:-translate-y-0.5"
+                data-testid="link-hero-start"
+              >
+                Start with your case <ArrowRight size={17} />
+              </Link>
+              <Link
+                href="/sign-in"
+                className="inline-flex h-12 items-center rounded-xl border border-primary/20 bg-background/50 px-5 font-bold text-primary hover:bg-background"
+                data-testid="link-hero-demo"
+              >
+                Use a demo account
+              </Link>
+            </div>
+            <div className="mt-11 flex items-center gap-5 text-xs font-bold text-primary/55">
+              <span className="flex items-center gap-2">
+                <ShieldCheck size={16} />
+                Plain-language guidance
+              </span>
+              <span className="flex items-center gap-2">
+                <LockIcon />
+                Private by design
+              </span>
+            </div>
+          </div>
+          <div
+            className="jc-rise relative mx-auto w-full max-w-[430px]"
+            style={{ animationDelay: ".12s" }}
+          >
+            <div className="absolute -inset-8 rounded-full bg-[#c7ded2]/60 blur-3xl" />
+            <Card className="relative rotate-[2deg] overflow-hidden border-primary/10 bg-[#fbf7ec] p-5 shadow-[18px_22px_0_hsl(var(--primary)/.08)]">
+              <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+                <div>
+                  <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-primary/50">
+                    Case companion
+                  </div>
+                  <div className="mt-1 font-serif text-lg font-bold text-primary">
+                    Your case, in one place
+                  </div>
+                </div>
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#dcebe3] text-[#3e8b73]">
+                  <ClipboardList size={18} />
+                </div>
+              </div>
+              <div className="mt-5 rounded-xl bg-[#e7f1eb] p-4">
+                <div className="flex justify-between text-xs font-bold text-primary/60">
+                  <span>CASE JC-2024-0187</span>
+                  <span className="text-[#3e8b73]">Active</span>
+                </div>
+                <div className="mt-2 font-serif text-lg font-bold text-primary">
+                  Property boundary review
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-primary/10">
+                  <div className="h-full w-[68%] rounded-full bg-[#4c9a72]" />
+                </div>
+                <div className="mt-2 flex justify-between text-[11px] text-primary/55">
+                  <span>Filed 14 Feb 2024</span>
+                  <span>68% organized</span>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2">
+                <div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#f7e7c2] text-[#795a17]">
+                    <CalendarDays size={15} />
+                  </div>
+                  <div className="text-xs">
+                    <b className="block text-primary">Next hearing</b>
+                    <span className="text-primary/55">
+                      12 September · District Court
+                    </span>
+                  </div>
+                  <ChevronRight size={15} className="ml-auto text-primary/35" />
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#dbe9eb] text-[#255c67]">
+                    <FileText size={15} />
+                  </div>
+                  <div className="text-xs">
+                    <b className="block text-primary">2 documents explained</b>
+                    <span className="text-primary/55">
+                      Last updated yesterday
+                    </span>
+                  </div>
+                  <ChevronRight size={15} className="ml-auto text-primary/35" />
+                </div>
+              </div>
+              <div className="mt-5 flex items-center gap-2 border-t border-primary/10 pt-4 text-xs text-primary/55">
+                <Sparkles size={14} className="text-[#c38d3e]" /> A small step
+                is still a step.
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+      <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+        <div className="grid gap-12 md:grid-cols-[.8fr_1.2fr]">
+          <div>
+            <div className="jc-mono text-xs font-bold uppercase tracking-[.18em] text-[#3e8b73]">
+              A public-service companion
+            </div>
+            <h2 className="jc-serif mt-4 max-w-md text-4xl font-bold leading-tight text-primary">
+              Less legal fog.
+              <br />
+              More footing.
+            </h2>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-3">
+            <Feature
+              icon={BookOpen}
+              number="01"
+              title="Understand"
+              text="Translate formal documents into a plain-language starting point."
+            />
+            <Feature
+              icon={ClipboardList}
+              number="02"
+              title="Organize"
+              text="Keep case details, hearings, and records together."
+            />
+            <Feature
+              icon={Users}
+              number="03"
+              title="Connect"
+              text="Find a fictional sample lawyer or ask your next question."
+            />
+          </div>
+        </div>
+      </section>
+      <section className="bg-primary text-primary-foreground">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 md:grid-cols-[1fr_.8fr] md:px-8">
+          <div>
+            <div className="jc-mono text-xs uppercase tracking-[.18em] text-accent">
+              Built for the real moment
+            </div>
+            <h2 className="jc-serif mt-4 max-w-2xl text-4xl font-bold leading-tight md:text-5xl">
+              When a letter arrives and you do not know where to begin.
+            </h2>
+            <p className="mt-5 max-w-xl leading-7 text-primary-foreground/65">
+              Start with the piece in front of you. See what it says, what it
+              does not say, and which question is worth asking next.
+            </p>
+          </div>
+          <div className="grid gap-3 self-center">
+            <Quote
+              text="I finally understood which date mattered."
+              label="A citizen's first step"
+            />
+            <Quote
+              text="The overview gives me enough context to help."
+              label="A lawyer's working view"
+            />
+          </div>
+        </div>
+      </section>
+      <section className="mx-auto max-w-7xl px-5 py-16 md:px-8">
+        <div className="flex flex-col justify-between gap-6 border-b border-border pb-8 sm:flex-row sm:items-end">
+          <div>
+            <div className="jc-mono text-xs uppercase tracking-[.18em] text-[#3e8b73]">
+              Start here
+            </div>
+            <h2 className="jc-serif mt-3 text-3xl font-bold text-primary">
+              A clearer next step is close.
+            </h2>
+          </div>
+          <Link
+            href="/sign-up"
+            className="inline-flex items-center gap-2 text-sm font-bold text-primary underline decoration-accent decoration-2 underline-offset-4"
+            data-testid="link-final-start"
+          >
+            Create your free demo account <ArrowRight size={15} />
+          </Link>
+        </div>
+        <div className="mt-8 flex flex-wrap gap-3 text-sm text-muted-foreground">
+          <span className="rounded-full bg-secondary px-4 py-2">
+            No OTP or social login
+          </span>
+          <span className="rounded-full bg-secondary px-4 py-2">
+            Fictional sample accounts
+          </span>
+          <span className="rounded-full bg-secondary px-4 py-2">
+            Academic prototype
+          </span>
+        </div>
+      </section>
+      <footer className="border-t border-border px-5 py-7 text-center text-xs text-muted-foreground">
+        Justice Connect · An academic civic-tech prototype · Not legal advice
+      </footer>
+    </div>
+  );
 }
 function Home() {
   useHealthCheck();
   const t = useCopy();
-  return <div className="jc-noise min-h-[100dvh] bg-background text-foreground"><PublicHeader /><section className="relative overflow-hidden border-b border-border bg-[#e8efe9]"><div className="jc-grid absolute inset-0 opacity-70" /><div className="relative mx-auto grid min-h-[620px] max-w-7xl items-center gap-12 px-5 pb-20 pt-28 md:grid-cols-[1.1fr_.9fr] md:px-8"><div className="jc-rise max-w-2xl"><Badge tone="blue"><HeartHandshake size={13} />{t('A calmer way forward')}</Badge><h1 className="jc-serif mt-6 text-[clamp(3.3rem,7vw,6.4rem)] font-bold leading-[.98] tracking-[-.055em] text-primary">{t('Make sense')}<br /><span className="text-[#3e8b73]">{t('of what comes next.')}</span></h1><p className="mt-7 max-w-xl text-lg leading-8 text-primary/70">{t('Justice Connect helps you understand a confusing case, keep important records close, and find a clear next step — without the intimidating legal maze.')}</p><div className="mt-9 flex flex-wrap gap-3"><Link href="/sign-up" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-bold text-primary-foreground hover:-translate-y-0.5" data-testid="link-hero-start">{t('Start with your case')} <ArrowRight size={17} /></Link><Link href="/sign-in" className="inline-flex h-12 items-center rounded-xl border border-primary/20 bg-background/50 px-5 font-bold text-primary hover:bg-background" data-testid="link-hero-demo">{t('Use a demo account')}</Link></div><div className="mt-11 flex items-center gap-5 text-xs font-bold text-primary/55"><span className="flex items-center gap-2"><ShieldCheck size={16} />{t('Plain-language guidance')}</span><span className="flex items-center gap-2"><LockIcon />{t('Private by design')}</span></div></div><div className="jc-rise relative mx-auto w-full max-w-[430px]" style={{ animationDelay: '.12s' }}><div className="absolute -inset-8 rounded-full bg-[#c7ded2]/60 blur-3xl" /><Card className="relative rotate-[2deg] overflow-hidden border-primary/10 bg-[#fbf7ec] p-5 shadow-[18px_22px_0_hsl(var(--primary)/.08)]"><div className="flex items-center justify-between border-b border-primary/10 pb-4"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-primary/50">{t('Case companion')}</div><div className="mt-1 font-serif text-lg font-bold text-primary">{t('Your case, in one place')}</div></div><div className="grid h-9 w-9 place-items-center rounded-lg bg-[#dcebe3] text-[#3e8b73]"><ClipboardList size={18} /></div></div><div className="mt-5 rounded-xl bg-[#e7f1eb] p-4"><div className="flex justify-between text-xs font-bold text-primary/60"><span>CASE JC-2024-0187</span><span className="text-[#3e8b73]">{t('Active')}</span></div><div className="mt-2 font-serif text-lg font-bold text-primary">{t('Property boundary review')}</div><div className="mt-4 h-2 overflow-hidden rounded-full bg-primary/10"><div className="h-full w-[68%] rounded-full bg-[#4c9a72]" /></div><div className="mt-2 flex justify-between text-[11px] text-primary/55"><span>{t('Filed')} 14 Feb 2024</span><span>68% {t('organized')}</span></div></div><div className="mt-4 grid gap-2"><div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3"><div className="grid h-8 w-8 place-items-center rounded-lg bg-[#f7e7c2] text-[#795a17]"><CalendarDays size={15} /></div><div className="text-xs"><b className="block text-primary">{t('Next hearing')}</b><span className="text-primary/55">12 September · District Court</span></div><ChevronRight size={15} className="ml-auto text-primary/35" /></div><div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3"><div className="grid h-8 w-8 place-items-center rounded-lg bg-[#dbe9eb] text-[#255c67]"><FileText size={15} /></div><div className="text-xs"><b className="block text-primary">{t('2 documents explained')}</b><span className="text-primary/55">{t('Last updated yesterday')}</span></div><ChevronRight size={15} className="ml-auto text-primary/35" /></div></div><div className="mt-5 flex items-center gap-2 border-t border-primary/10 pt-4 text-xs text-primary/55"><Sparkles size={14} className="text-[#c38d3e]" />{t('A small step is still a step.')}</div></Card></div></div></section><section className="mx-auto max-w-7xl px-5 py-20 md:px-8"><div className="grid gap-12 md:grid-cols-[.8fr_1.2fr]"><div><div className="jc-mono text-xs font-bold uppercase tracking-[.18em] text-[#3e8b73]">{t('A public-service companion')}</div><h2 className="jc-serif mt-4 max-w-md text-4xl font-bold leading-tight text-primary">{t('Less legal fog.')}<br />{t('More footing.')}</h2></div><div className="grid gap-8 sm:grid-cols-3"><Feature icon={BookOpen} number="01" title="Understand" text="Translate formal documents into a plain-language starting point." /><Feature icon={ClipboardList} number="02" title="Organize" text="Keep case details, hearings, and records together." /><Feature icon={Users} number="03" title="Connect" text="Find a fictional sample lawyer or ask your next question." /></div></div></section><section className="bg-primary text-primary-foreground"><div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 md:grid-cols-[1fr_.8fr] md:px-8"><div><div className="jc-mono text-xs uppercase tracking-[.18em] text-accent">{t('Built for the real moment')}</div><h2 className="jc-serif mt-4 max-w-2xl text-4xl font-bold leading-tight md:text-5xl">{t('When a letter arrives and you do not know where to begin.')}</h2><p className="mt-5 max-w-xl leading-7 text-primary-foreground/65">{t('Start with the piece in front of you. See what it says, what it does not say, and which question is worth asking next.')}</p></div><div className="grid gap-3 self-center"><Quote text="I finally understood which date mattered." label="A citizen's first step" /><Quote text="The overview gives me enough context to help." label="A lawyer's working view" /></div></div></section><section className="mx-auto max-w-7xl px-5 py-16 md:px-8"><div className="flex flex-col justify-between gap-6 border-b border-border pb-8 sm:flex-row sm:items-end"><div><div className="jc-mono text-xs uppercase tracking-[.18em] text-[#3e8b73]">{t('Start here')}</div><h2 className="jc-serif mt-3 text-3xl font-bold text-primary">{t('A clearer next step is close.')}</h2></div><Link href="/sign-up" className="inline-flex items-center gap-2 text-sm font-bold text-primary underline decoration-accent decoration-2 underline-offset-4" data-testid="link-final-start">{t('Create your free demo account')} <ArrowRight size={15} /></Link></div><div className="mt-8 flex flex-wrap gap-3 text-sm text-muted-foreground"><span className="rounded-full bg-secondary px-4 py-2">{t('No OTP or social login')}</span><span className="rounded-full bg-secondary px-4 py-2">{t('Fictional sample accounts')}</span><span className="rounded-full bg-secondary px-4 py-2">{t('Academic prototype')}</span></div></section><footer className="border-t border-border px-5 py-7 text-center text-xs text-muted-foreground">Justice Connect · {t('An academic civic-tech prototype')} · {t('Not legal advice')}</footer></div>;
+  return (
+    <div className="jc-noise min-h-[100dvh] bg-background text-foreground">
+      <PublicHeader />
+      <section className="relative overflow-hidden border-b border-border bg-[#e8efe9]">
+        <div className="jc-grid absolute inset-0 opacity-70" />
+        <div className="relative mx-auto grid min-h-[620px] max-w-7xl items-center gap-12 px-5 pb-20 pt-28 md:grid-cols-[1.1fr_.9fr] md:px-8">
+          <div className="jc-rise max-w-2xl">
+            <Badge tone="blue">
+              <HeartHandshake size={13} />
+              {t("A calmer way forward")}
+            </Badge>
+            <h1 className="jc-serif mt-6 text-[clamp(3.3rem,7vw,6.4rem)] font-bold leading-[.98] tracking-[-.055em] text-primary">
+              {t("Make sense")}
+              <br />
+              <span className="text-[#3e8b73]">{t("of what comes next.")}</span>
+            </h1>
+            <p className="mt-7 max-w-xl text-lg leading-8 text-primary/70">
+              {t(
+                "Justice Connect helps you understand a confusing case, keep important records close, and find a clear next step — without the intimidating legal maze.",
+              )}
+            </p>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link
+                href="/sign-up"
+                className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-bold text-primary-foreground hover:-translate-y-0.5"
+                data-testid="link-hero-start"
+              >
+                {t("Start with your case")} <ArrowRight size={17} />
+              </Link>
+              <Link
+                href="/sign-in"
+                className="inline-flex h-12 items-center rounded-xl border border-primary/20 bg-background/50 px-5 font-bold text-primary hover:bg-background"
+                data-testid="link-hero-demo"
+              >
+                {t("Use a demo account")}
+              </Link>
+            </div>
+            <div className="mt-11 flex items-center gap-5 text-xs font-bold text-primary/55">
+              <span className="flex items-center gap-2">
+                <ShieldCheck size={16} />
+                {t("Plain-language guidance")}
+              </span>
+              <span className="flex items-center gap-2">
+                <LockIcon />
+                {t("Private by design")}
+              </span>
+            </div>
+          </div>
+          <div
+            className="jc-rise relative mx-auto w-full max-w-[430px]"
+            style={{ animationDelay: ".12s" }}
+          >
+            <div className="absolute -inset-8 rounded-full bg-[#c7ded2]/60 blur-3xl" />
+            <Card className="relative rotate-[2deg] overflow-hidden border-primary/10 bg-[#fbf7ec] p-5 shadow-[18px_22px_0_hsl(var(--primary)/.08)]">
+              <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+                <div>
+                  <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-primary/50">
+                    {t("Case companion")}
+                  </div>
+                  <div className="mt-1 font-serif text-lg font-bold text-primary">
+                    {t("Your case, in one place")}
+                  </div>
+                </div>
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#dcebe3] text-[#3e8b73]">
+                  <ClipboardList size={18} />
+                </div>
+              </div>
+              <div className="mt-5 rounded-xl bg-[#e7f1eb] p-4">
+                <div className="flex justify-between text-xs font-bold text-primary/60">
+                  <span>CASE JC-2024-0187</span>
+                  <span className="text-[#3e8b73]">{t("Active")}</span>
+                </div>
+                <div className="mt-2 font-serif text-lg font-bold text-primary">
+                  {t("Property boundary review")}
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-primary/10">
+                  <div className="h-full w-[68%] rounded-full bg-[#4c9a72]" />
+                </div>
+                <div className="mt-2 flex justify-between text-[11px] text-primary/55">
+                  <span>{t("Filed")} 14 Feb 2024</span>
+                  <span>68% {t("organized")}</span>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2">
+                <div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#f7e7c2] text-[#795a17]">
+                    <CalendarDays size={15} />
+                  </div>
+                  <div className="text-xs">
+                    <b className="block text-primary">{t("Next hearing")}</b>
+                    <span className="text-primary/55">
+                      12 September · District Court
+                    </span>
+                  </div>
+                  <ChevronRight size={15} className="ml-auto text-primary/35" />
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-primary/10 p-3">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#dbe9eb] text-[#255c67]">
+                    <FileText size={15} />
+                  </div>
+                  <div className="text-xs">
+                    <b className="block text-primary">
+                      {t("2 documents explained")}
+                    </b>
+                    <span className="text-primary/55">
+                      {t("Last updated yesterday")}
+                    </span>
+                  </div>
+                  <ChevronRight size={15} className="ml-auto text-primary/35" />
+                </div>
+              </div>
+              <div className="mt-5 flex items-center gap-2 border-t border-primary/10 pt-4 text-xs text-primary/55">
+                <Sparkles size={14} className="text-[#c38d3e]" />
+                {t("A small step is still a step.")}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+      <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+        <div className="grid gap-12 md:grid-cols-[.8fr_1.2fr]">
+          <div>
+            <div className="jc-mono text-xs font-bold uppercase tracking-[.18em] text-[#3e8b73]">
+              {t("A public-service companion")}
+            </div>
+            <h2 className="jc-serif mt-4 max-w-md text-4xl font-bold leading-tight text-primary">
+              {t("Less legal fog.")}
+              <br />
+              {t("More footing.")}
+            </h2>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-3">
+            <Feature
+              icon={BookOpen}
+              number="01"
+              title="Understand"
+              text="Translate formal documents into a plain-language starting point."
+            />
+            <Feature
+              icon={ClipboardList}
+              number="02"
+              title="Organize"
+              text="Keep case details, hearings, and records together."
+            />
+            <Feature
+              icon={Users}
+              number="03"
+              title="Connect"
+              text="Find a fictional sample lawyer or ask your next question."
+            />
+          </div>
+        </div>
+      </section>
+      <section className="bg-muted py-20 px-5 md:px-8 border-y border-border">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-16">
+            <div className="jc-mono text-xs uppercase tracking-[.18em] text-[#3e8b73]">
+              {t("How Justice Connect Works")}
+            </div>
+            <h2 className="jc-serif mt-4 text-3xl font-bold text-primary md:text-4xl">
+              {t("Connecting Citizens to Verified Legal Help")}
+            </h2>
+            <p className="mt-4 mx-auto max-w-2xl text-primary/70">
+              {t("Our platform streamlines the journey from understanding your legal situation to finding the right representation.")}
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-4">
+            <div className="bg-background rounded-2xl p-6 shadow-sm border border-border text-center hover:-translate-y-1 transition-transform">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#e8efe9] text-[#3e8b73] mb-4">
+                <FileText size={20} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">{t("1. Submit Details")}</h3>
+              <p className="text-sm text-primary/60">{t("Share your case details and upload relevant documents securely.")}</p>
+            </div>
+            <div className="bg-background rounded-2xl p-6 shadow-sm border border-border text-center hover:-translate-y-1 transition-transform">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#e8efe9] text-[#3e8b73] mb-4">
+                <Search size={20} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">{t("2. Find a Lawyer")}</h3>
+              <p className="text-sm text-primary/60">{t("Browse through our directory of verified lawyers based on specialization.")}</p>
+            </div>
+            <div className="bg-background rounded-2xl p-6 shadow-sm border border-border text-center hover:-translate-y-1 transition-transform">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#e8efe9] text-[#3e8b73] mb-4">
+                <Send size={20} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">{t("3. Send Request")}</h3>
+              <p className="text-sm text-primary/60">{t("Request an appointment or case review directly through the platform.")}</p>
+            </div>
+            <div className="bg-background rounded-2xl p-6 shadow-sm border border-border text-center hover:-translate-y-1 transition-transform">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#e8efe9] text-[#3e8b73] mb-4">
+                <MessageCircleQuestion size={20} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">{t("4. Get Answers")}</h3>
+              <p className="text-sm text-primary/60">{t("Communicate securely and track your case progress in real-time.")}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="bg-primary text-primary-foreground">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 md:grid-cols-[1fr_.8fr] md:px-8">
+          <div>
+            <div className="jc-mono text-xs uppercase tracking-[.18em] text-accent">
+              {t("Built for the real moment")}
+            </div>
+            <h2 className="jc-serif mt-4 max-w-2xl text-4xl font-bold leading-tight md:text-5xl">
+              {t("When a letter arrives and you do not know where to begin.")}
+            </h2>
+            <p className="mt-5 max-w-xl leading-7 text-primary-foreground/65">
+              {t(
+                "Start with the piece in front of you. See what it says, what it does not say, and which question is worth asking next.",
+              )}
+            </p>
+          </div>
+          <div className="grid gap-3 self-center">
+            <Quote
+              text="I finally understood which date mattered."
+              label="A citizen's first step"
+            />
+            <Quote
+              text="The overview gives me enough context to help."
+              label="A lawyer's working view"
+            />
+          </div>
+        </div>
+      </section>
+      <section className="mx-auto max-w-7xl px-5 py-16 md:px-8">
+        <div className="flex flex-col justify-between gap-6 border-b border-border pb-8 sm:flex-row sm:items-end">
+          <div>
+            <div className="jc-mono text-xs uppercase tracking-[.18em] text-[#3e8b73]">
+              {t("Start here")}
+            </div>
+            <h2 className="jc-serif mt-3 text-3xl font-bold text-primary">
+              {t("A clearer next step is close.")}
+            </h2>
+          </div>
+          <Link
+            href="/sign-up"
+            className="inline-flex items-center gap-2 text-sm font-bold text-primary underline decoration-accent decoration-2 underline-offset-4"
+            data-testid="link-final-start"
+          >
+            {t("Create your free demo account")} <ArrowRight size={15} />
+          </Link>
+        </div>
+        <div className="mt-8 flex flex-wrap gap-3 text-sm text-muted-foreground">
+          <span className="rounded-full bg-secondary px-4 py-2">
+            {t("No OTP or social login")}
+          </span>
+          <span className="rounded-full bg-secondary px-4 py-2">
+            {t("Fictional sample accounts")}
+          </span>
+          <span className="rounded-full bg-secondary px-4 py-2">
+            {t("Academic prototype")}
+          </span>
+        </div>
+      </section>
+      <footer className="border-t border-border px-5 py-7 text-center text-xs text-muted-foreground">
+        Justice Connect · {t("An academic civic-tech prototype")} ·{" "}
+        {t("Not legal advice")}
+      </footer>
+    </div>
+  );
 }
 
-function LockIcon() { return <span className="inline-block h-3.5 w-3.5 rounded-[4px] border-2 border-current" />; }
-function Feature({ icon: Icon, number, title, text }: any) { const t = useCopy(); return <div><div className="flex items-center justify-between text-xs text-muted-foreground"><span className="jc-mono">{number}</span><Icon size={19} className="text-[#3e8b73]" /></div><h3 className="mt-4 font-serif text-xl font-bold text-primary">{t(title)}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{t(text)}</p></div>; }
-function Quote({ text, label }: any) { const t = useCopy(); return <div className="rounded-xl border border-primary-foreground/10 bg-primary-foreground/5 p-4"><div className="font-serif text-lg">“{t(text)}”</div><div className="mt-2 text-xs text-primary-foreground/50">{t(label)}</div></div>; }
+function LockIcon() {
+  return (
+    <span className="inline-block h-3.5 w-3.5 rounded-[4px] border-2 border-current" />
+  );
+}
+function Feature({ icon: Icon, number, title, text }: any) {
+  const t = useCopy();
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span className="jc-mono">{number}</span>
+        <Icon size={19} className="text-[#3e8b73]" />
+      </div>
+      <h3 className="mt-4 font-serif text-xl font-bold text-primary">
+        {t(title)}
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{t(text)}</p>
+    </div>
+  );
+}
+function Quote({ text, label }: any) {
+  const t = useCopy();
+  return (
+    <div className="rounded-xl border border-primary-foreground/10 bg-primary-foreground/5 p-4">
+      <div className="font-serif text-lg">“{t(text)}”</div>
+      <div className="mt-2 text-xs text-primary-foreground/50">{t(label)}</div>
+    </div>
+  );
+}
 function VoiceDemo() {
-  const [status, setStatus] = useState('Ready for a short voice demo.');
+  const [status, setStatus] = useState("Ready for a short voice demo.");
   const listen = () => {
-    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!Recognition) { setStatus('Voice recognition is not available in this browser. Demo mode is ready.'); return; }
+    const Recognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!Recognition) {
+      setStatus(
+        "Voice recognition is not available in this browser. Demo mode is ready.",
+      );
+      return;
+    }
     const recognition = new Recognition();
-    recognition.lang = 'en-IN';
-    recognition.onstart = () => setStatus('Listening… say “show my cases”.');
-    recognition.onresult = (event: any) => setStatus(`Heard: “${event.results[0][0].transcript}”`);
-    recognition.onerror = () => setStatus('The voice demo could not hear that. You can continue with the buttons.');
+    recognition.lang = "en-IN";
+    recognition.onstart = () => setStatus("Listening… say “show my cases”.");
+    recognition.onresult = (event: any) =>
+      setStatus(`Heard: “${event.results[0][0].transcript}”`);
+    recognition.onerror = () =>
+      setStatus(
+        "The voice demo could not hear that. You can continue with the buttons.",
+      );
     recognition.start();
   };
-  return <Card className="p-5"><div className="flex items-center gap-2"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]"><Mic size={17} /></div><div><h2 className="font-serif text-xl font-bold">Voice assistance</h2><p className="text-xs text-muted-foreground">A lightweight browser demo</p></div></div><p className="mt-4 text-sm leading-6 text-muted-foreground">{status}</p><Button variant="outline" className="mt-4 min-h-9 text-xs" onClick={listen} data-testid="button-voice-demo">Try voice demo</Button></Card>;
+  return (
+    <Card className="p-5">
+      <div className="flex items-center gap-2">
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]">
+          <Mic size={17} />
+        </div>
+        <div>
+          <h2 className="font-serif text-xl font-bold">Voice assistance</h2>
+          <p className="text-xs text-muted-foreground">
+            A lightweight browser demo
+          </p>
+        </div>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-muted-foreground">{status}</p>
+      <Button
+        variant="outline"
+        className="mt-4 min-h-9 text-xs"
+        onClick={listen}
+        data-testid="button-voice-demo"
+      >
+        Try voice demo
+      </Button>
+    </Card>
+  );
 }
 function HearingReminder() {
   const [saved, setSaved] = useState(false);
-  return <Card className="p-5"><div className="flex items-center justify-between"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">Next hearing</div><h2 className="jc-serif mt-1 text-xl font-bold">Evidence review</h2></div><CalendarDays size={19} className="text-accent" /></div><div className="mt-4 grid gap-2 text-sm"><div><b>18 September 2026 · 11:00 AM</b></div><div className="text-muted-foreground">Chennai Civil Court · Chennai</div><div className="text-muted-foreground">Current stage: Evidence Review</div></div><Button variant="outline" className="mt-4 min-h-9 text-xs" onClick={() => setSaved(true)} data-testid="button-set-reminder">{saved ? <><Check size={14} />Reminder saved for this demo</> : 'Set reminder'}</Button><div className="mt-4 rounded-xl bg-[#f7e7c2] p-3 text-xs leading-5 text-[#795a17]"><b>Travel planning note:</b> Plan your travel in advance and arrive before the scheduled time.</div></Card>;
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">
+            Next hearing
+          </div>
+          <h2 className="jc-serif mt-1 text-xl font-bold">Evidence review</h2>
+        </div>
+        <CalendarDays size={19} className="text-accent" />
+      </div>
+      <div className="mt-4 grid gap-2 text-sm">
+        <div>
+          <b>18 September 2026 · 11:00 AM</b>
+        </div>
+        <div className="text-muted-foreground">
+          Chennai Civil Court · Chennai
+        </div>
+        <div className="text-muted-foreground">
+          Current stage: Evidence Review
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="mt-4 min-h-9 text-xs"
+        onClick={() => setSaved(true)}
+        data-testid="button-set-reminder"
+      >
+        {saved ? (
+          <>
+            <Check size={14} />
+            Reminder saved for this demo
+          </>
+        ) : (
+          "Set reminder"
+        )}
+      </Button>
+      <div className="mt-4 rounded-xl bg-[#f7e7c2] p-3 text-xs leading-5 text-[#795a17]">
+        <b>Travel planning note:</b> Plan your travel in advance and arrive
+        before the scheduled time.
+      </div>
+    </Card>
+  );
 }
 
-function Auth({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+function Auth({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [, setLocation] = useLocation();
   const login = useLogin();
   const register = useRegister();
   const t = useCopy();
-  const demoRoleKey = 'justice-connect-demo-role';
-  const [demo, setDemo] = useState('citizen');
-  const [accountRole, setAccountRole] = useState<'citizen' | 'lawyer'>('citizen');
-  const isSignIn = mode === 'sign-in';
+  const demoRoleKey = "justice-connect-demo-role";
+  const [demo, setDemo] = useState("citizen");
+  const [accountRole, setAccountRole] = useState<"citizen" | "lawyer">("citizen");
+  const [step, setStep] = useState<"role" | "form" | "forgot-password-email" | "forgot-password-otp" | "forgot-password-reset">("role");
+  const isSignIn = mode === "sign-in";
   const [form, setForm] = useState({
-    name: '', identifier: '', email: '', password: '', sampleRegistrationNumber: '',
-    verificationDocumentName: '', specialization: 'Civil Law', location: 'Chennai',
-    languages: 'Tamil, English', experience: '3', availability: 'Available',
+    name: "",
+    identifier: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    otp: "",
+    sampleRegistrationNumber: "",
+    verificationDocumentName: "",
+    specialization: "Civil Law",
+    location: "Chennai",
+    languages: "Tamil, English",
+    experience: "3",
+    availability: "Available",
   });
-  const [error, setError] = useState('');
-  const update = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }));
+  const [error, setError] = useState("");
+  const update = (key: string, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
   const submit = (e: any) => {
     e.preventDefault();
-    setError('');
+    setError("");
     const data: any = isSignIn
-      ? { identifier: form.identifier, password: form.password }
+      ? { identifier: form.identifier, password: form.password, role: accountRole }
       : {
-        name: form.name, email: form.email, password: form.password, role: accountRole, language: 'English',
-        ...(accountRole === 'lawyer' ? {
-          sampleRegistrationNumber: form.sampleRegistrationNumber,
-          verificationDocumentName: form.verificationDocumentName,
-          specialization: form.specialization, location: form.location,
-          languages: form.languages.split(',').map(item => item.trim()).filter(Boolean),
-          experience: Number(form.experience), availability: form.availability,
-        } : {}),
-      };
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: accountRole,
+          language: "English",
+          ...(accountRole === "lawyer"
+            ? {
+                sampleRegistrationNumber: form.sampleRegistrationNumber,
+                verificationDocumentName: form.verificationDocumentName,
+                specialization: form.specialization,
+                location: form.location,
+                languages: form.languages
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+                experience: Number(form.experience),
+                availability: form.availability,
+              }
+            : {}),
+        };
     const mutation: any = isSignIn ? login : register;
-    mutation.mutate({ data }, {
-      onSuccess: (res: any) => {
-        localStorage.setItem(tokenKey, res.token);
-        localStorage.setItem(userKey, JSON.stringify(res.user));
-        setLocation(`/${res.user.role}`);
+    mutation.mutate(
+      { data },
+      {
+        onSuccess: (res: any) => {
+          localStorage.setItem(tokenKey, res.token);
+          localStorage.setItem(userKey, JSON.stringify(res.user));
+          setLocation(`/${res.user.role}`);
+        },
+        onError: (err: any) => {
+          let errorMsg = "";
+          if (!isSignIn && err?.data?.error) {
+             errorMsg = err.data.error;
+          } else if (isSignIn && err?.data?.error) {
+             errorMsg = err.data.error;
+          } else {
+             errorMsg = isSignIn
+                ? t("We could not sign you in. Check the account details.")
+                : t("We could not create that account. Check the details and try again.");
+          }
+          setError(errorMsg);
+        },
       },
-      onError: (err: any) => setError(!isSignIn && err?.status === 400
-        ? t('That email is already registered. Use Sign in to open the demo account.')
-        : isSignIn
-          ? t('We could not sign you in. Check the account details or choose a demo role below.')
-          : t('We could not create that account. Check the details and try again.')),
-    });
+    );
   };
+  const { mutate: forgotPasswordRequest, isPending: isForgotRequestPending } = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/auth/forgot-password/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to request OTP");
+      return json;
+    },
+    onSuccess: (data) => {
+      alert(data.mockOtp ? `[MOCK EMAIL SIMULATION]\nYour password reset OTP is: ${data.mockOtp}` : "OTP sent to your email.");
+      setStep("forgot-password-otp");
+    },
+    onError: (err: any) => setError(err.message),
+  });
+
+  const { mutate: forgotPasswordVerify, isPending: isForgotVerifyPending } = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/auth/forgot-password/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to verify OTP");
+      return json;
+    },
+    onSuccess: () => {
+      setStep("forgot-password-reset");
+    },
+    onError: (err: any) => setError(err.message),
+  });
+
+  const { mutate: forgotPasswordReset, isPending: isForgotResetPending } = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/auth/forgot-password/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to reset password");
+      return json;
+    },
+    onSuccess: () => {
+      alert("Password reset successful. You can now sign in.");
+      setStep("form");
+    },
+    onError: (err: any) => setError(err.message),
+  });
   const fillDemo = (role: string) => {
     setDemo(role);
-    setForm(current => ({ ...current, name: '', identifier: role === 'citizen' ? 'citizen@example.com' : role === 'lawyer' ? 'lawyer@example.com' : 'JC-ADMIN-001', email: '', password: role === 'admin' ? 'admin12345' : 'password123' }));
+    setForm((current) => ({
+      ...current,
+      name: "",
+      identifier:
+        role === "citizen"
+          ? "citizen@example.com"
+          : role === "lawyer"
+            ? "lawyer@example.com"
+            : "JC-ADMIN-001",
+      email: "",
+      password: role === "admin" ? "admin12345" : "password123",
+    }));
   };
   useEffect(() => {
     if (!isSignIn) return;
     const savedRole = localStorage.getItem(demoRoleKey);
-    if (savedRole) { fillDemo(savedRole); localStorage.removeItem(demoRoleKey); }
+    if (savedRole) {
+      fillDemo(savedRole);
+      localStorage.removeItem(demoRoleKey);
+    }
   }, [isSignIn]);
-  return <div className="jc-noise grid min-h-[100dvh] bg-[#e8efe9] lg:grid-cols-[.9fr_1.1fr]">
-    <div className="hidden flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex"><Link href="/" className="flex items-center gap-3" data-testid="link-auth-brand"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary"><Landmark size={20} /></span><span className="font-serif text-lg font-bold leading-none">Justice<br /><i className="font-normal">Connect</i></span></Link><div className="max-w-md"><div className="jc-mono text-xs uppercase tracking-[.18em] text-accent">{t('A steadier place to begin')}</div><h1 className="jc-serif mt-5 text-5xl font-bold leading-[1.05]">{t('Your questions deserve room to breathe.')}</h1><p className="mt-6 leading-7 text-primary-foreground/65">{t('Use a demo account to explore the citizen, lawyer, or administrator experience.')}</p></div><div className="text-xs text-primary-foreground/45">{t('Academic prototype · Fictional data only')}</div></div>
-    <div className="flex items-center justify-center px-5 py-12"><div className="w-full max-w-[560px]"><div className="mb-8 flex items-center justify-between lg:hidden"><Link href="/" className="flex items-center gap-2 font-serif font-bold text-primary" data-testid="link-mobile-auth-brand"><span className="grid h-8 w-8 place-items-center rounded-lg bg-accent"><Landmark size={16} /></span>Justice Connect</Link><Link href="/" className="text-sm font-bold text-muted-foreground" data-testid="link-auth-back">{t('Back')}</Link></div><div className="mb-8"><Badge tone="blue">{t(isSignIn ? 'Welcome back' : 'Begin here')}</Badge><h2 className="jc-serif mt-4 text-4xl font-bold tracking-tight text-primary">{t(isSignIn ? 'Sign in to your space' : 'Create your account')}</h2><p className="mt-2 text-muted-foreground">{t(isSignIn ? 'Pick up where you left off.' : 'A simple account for a clearer case record.')}</p></div>
-      {!isSignIn && <div className="mb-5 grid gap-2"><div className="text-sm font-semibold">{t('Account type')}</div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setAccountRole('citizen')} className={cx('rounded-xl border px-3 py-3 text-left text-sm font-bold', accountRole === 'citizen' ? 'border-accent bg-accent/15 text-primary' : 'border-border bg-card hover:border-accent/60')} data-testid="button-register-citizen">{t('Citizen')}<span className="mt-1 block text-[10px] font-normal text-muted-foreground">{t('Use any email')}</span></button><button type="button" onClick={() => setAccountRole('lawyer')} className={cx('rounded-xl border px-3 py-3 text-left text-sm font-bold', accountRole === 'lawyer' ? 'border-accent bg-accent/15 text-primary' : 'border-border bg-card hover:border-accent/60')} data-testid="button-register-lawyer">{t('Lawyer')}<span className="mt-1 block text-[10px] font-normal text-muted-foreground">{t('Verification required')}</span></button></div><p className="text-xs text-muted-foreground">{t('Admin access is separate and cannot be created here. Use the administrator ID on Sign in.')}</p></div>}
-      {!isSignIn && <Field label={t('Your name')} autoComplete="name" value={form.name} onChange={(e: any) => update('name', e.target.value)} placeholder="Meera Krishnan" required data-testid="input-name" />}
-      <form onSubmit={submit} className="mt-4 grid gap-4">{isSignIn ? <Field label={t('Email or account ID')} autoComplete="username" value={form.identifier} onChange={(e: any) => update('identifier', e.target.value)} placeholder="you@example.com" required data-testid="input-identifier" /> : <Field label={t('Email address')} type="email" autoComplete="email" value={form.email} onChange={(e: any) => update('email', e.target.value)} placeholder="you@example.com" required data-testid="input-email" />}<Field label={t('Password')} type="password" autoComplete={isSignIn ? 'current-password' : 'new-password'} value={form.password} onChange={(e: any) => update('password', e.target.value)} placeholder="8 characters minimum" required minLength={8} data-testid="input-password" />
-        {!isSignIn && accountRole === 'lawyer' && <div className="grid gap-4 rounded-2xl border border-accent/25 bg-secondary/35 p-4 sm:grid-cols-2"><div className="sm:col-span-2"><div className="text-sm font-bold text-primary">{t('Lawyer application')}</div><p className="mt-1 text-xs leading-5 text-muted-foreground">{t('Your application starts as pending verification. Use fictional sample data for this academic prototype.')}</p></div><Field label={t('Council / registration number')} value={form.sampleRegistrationNumber} onChange={(e: any) => update('sampleRegistrationNumber', e.target.value)} placeholder="TN-DEMO-2026-014" required data-testid="input-lawyer-council-number" /><Field label={t('Dummy verification document')} value={form.verificationDocumentName} onChange={(e: any) => update('verificationDocumentName', e.target.value)} placeholder="bar-council-certificate-demo.pdf" required data-testid="input-lawyer-document" /><Field label={t('Specialization')} value={form.specialization} onChange={(e: any) => update('specialization', e.target.value)} required data-testid="input-lawyer-specialization" /><Field label={t('Location')} value={form.location} onChange={(e: any) => update('location', e.target.value)} required data-testid="input-lawyer-location" /><Field label={t('Languages')} value={form.languages} onChange={(e: any) => update('languages', e.target.value)} placeholder="Tamil, English" required data-testid="input-lawyer-languages" /><Field label={t('Experience (years)')} type="number" min="0" value={form.experience} onChange={(e: any) => update('experience', e.target.value)} required data-testid="input-lawyer-experience" /><Field label={t('Availability')} value={form.availability} onChange={(e: any) => update('availability', e.target.value)} required data-testid="input-lawyer-availability" /><div className="sm:col-span-2 flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Info size={14} className="mt-0.5 shrink-0 text-accent" />{t('The document is recorded by name only; no file bytes are uploaded in this prototype.')}</div></div>}
-        {error && <div className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]" data-testid="status-auth-error">{error}</div>}<Button type="submit" className="mt-2 h-12 w-full" disabled={login.isPending || register.isPending} data-testid="button-auth-submit">{(login.isPending || register.isPending) ? t('Opening your workspace…') : t(isSignIn ? 'Sign in' : accountRole === 'lawyer' ? 'Submit application' : 'Create account')} <ArrowRight size={16} /></Button></form>
-      <div className="my-7 flex items-center gap-3 text-xs text-muted-foreground"><div className="h-px flex-1 bg-border" />{t('or explore a demo')}<div className="h-px flex-1 bg-border" /></div><div className="grid gap-2 sm:grid-cols-3">{['citizen', 'lawyer', 'admin'].map(role => <button key={role} type="button" onClick={() => { if (!isSignIn) { localStorage.setItem(demoRoleKey, role); setLocation('/sign-in'); return; } fillDemo(role); }} className={cx('rounded-xl border px-3 py-3 text-left text-xs font-bold capitalize', demo === role ? 'border-accent bg-accent/15 text-primary' : 'border-border bg-card hover:border-accent/60')} data-testid={`button-demo-${role}`}>{t(role)}<span className="mt-1 block text-[10px] font-normal text-muted-foreground">{t(role === 'citizen' ? 'Track a case' : role === 'lawyer' ? 'Answer questions' : 'Steward data')}</span></button>)}</div>{isSignIn && <p className="mt-4 text-center text-xs text-muted-foreground">{t('Select a role above to pre-fill its fictional demo account.')}</p>}<p className="mt-8 text-center text-sm text-muted-foreground">{t(isSignIn ? 'New to Justice Connect?' : 'Already have an account?')} <Link href={isSignIn ? '/sign-up' : '/sign-in'} className="font-bold text-primary underline underline-offset-4" data-testid="link-auth-switch">{t(isSignIn ? 'Create one' : 'Sign in')}</Link></p><PrototypeNote /></div></div></div>;
+  return (
+    <div className="jc-noise grid min-h-[100dvh] bg-[#e8efe9] lg:grid-cols-[.9fr_1.1fr]">
+      <div className="hidden flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex">
+        <Link
+          href="/"
+          className="flex items-center gap-3"
+          data-testid="link-auth-brand"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary">
+            <Landmark size={20} />
+          </span>
+          <span className="font-serif text-lg font-bold leading-none">
+            Justice
+            <br />
+            <i className="font-normal">Connect</i>
+          </span>
+        </Link>
+        <div className="max-w-md">
+          <div className="jc-mono text-xs uppercase tracking-[.18em] text-accent">
+            {t("A steadier place to begin")}
+          </div>
+          <h1 className="jc-serif mt-5 text-5xl font-bold leading-[1.05]">
+            {t("Your questions deserve room to breathe.")}
+          </h1>
+          <p className="mt-6 leading-7 text-primary-foreground/65">
+            {t(
+              "Use a demo account to explore the citizen, lawyer, or administrator experience.",
+            )}
+          </p>
+        </div>
+        <div className="text-xs text-primary-foreground/45">
+          {t("Academic prototype · Fictional data only")}
+        </div>
+      </div>
+      <div className="flex items-center justify-center px-5 py-12">
+        <div className="w-full max-w-[560px]">
+          <div className="mb-8 flex items-center justify-between lg:hidden">
+            <Link
+              href="/"
+              className="flex items-center gap-2 font-serif font-bold text-primary"
+              data-testid="link-mobile-auth-brand"
+            >
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent">
+                <Landmark size={16} />
+              </span>
+              Justice Connect
+            </Link>
+            {(!isSignIn && step === "form") || step.startsWith("forgot-password") ? (
+              <button
+                type="button"
+                onClick={() => setStep(step.startsWith("forgot-password") ? "form" : "role")}
+                className="text-sm font-bold text-muted-foreground"
+                data-testid="link-auth-back"
+              >
+                {t("Back")}
+              </button>
+            ) : (
+              <Link
+                href="/"
+                className="text-sm font-bold text-muted-foreground"
+                data-testid="link-auth-back"
+              >
+                {t("Back")}
+              </Link>
+            )}
+          </div>
+          <div className="mb-8">
+            <Badge tone="blue">
+              {t(isSignIn ? "Welcome back" : "Begin here")}
+            </Badge>
+            <h2 className="jc-serif mt-4 text-4xl font-bold tracking-tight text-primary">
+              {t(isSignIn ? "Sign in to your space" : "Create your account")}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                isSignIn
+                  ? "Pick up where you left off."
+                  : "A simple account for a clearer case record.",
+              )}
+            </p>
+          </div>
+          {step === "role" && (
+            <div className="mb-5 grid gap-2">
+              <div className="text-sm font-semibold">{t("Account type")}</div>
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAccountRole("citizen"); setStep("form"); }}
+                  className="rounded-xl border px-4 py-5 text-left border-border bg-card hover:border-accent/60 transition-colors"
+                  data-testid="button-register-citizen"
+                >
+                  <div className="text-lg font-bold text-primary flex items-center gap-2">
+                    <span>👤</span> {t("CITIZEN")}
+                  </div>
+                  <span className="mt-2 block text-sm font-normal text-muted-foreground">
+                    {t("Track cases and find legal answers.")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAccountRole("lawyer"); setStep("form"); }}
+                  className="rounded-xl border px-4 py-5 text-left border-border bg-card hover:border-accent/60 transition-colors"
+                  data-testid="button-register-lawyer"
+                >
+                  <div className="text-lg font-bold text-primary flex items-center gap-2">
+                    <span>⚖️</span> {t("LAWYER")}
+                  </div>
+                  <span className="mt-2 block text-sm font-normal text-muted-foreground">
+                    {t("Manage cases and answer citizen questions. Verification required.")}
+                  </span>
+                </button>
+              </div>
+              <p className="mt-4 text-xs text-muted-foreground text-center">
+                {t("Admin access is separate and cannot be created here. Use the administrator ID on Sign in.")}
+              </p>
+            </div>
+          )}
+
+          {step === "role" && isSignIn && (
+            <p className="mt-4 text-xs text-muted-foreground text-center">
+              Admin? Use the administrator ID on Sign in after selecting any role.
+            </p>
+          )}
+          {step === "forgot-password-email" && (
+            <form onSubmit={(e) => { e.preventDefault(); setError(""); forgotPasswordRequest({ email: form.email || form.identifier }); }} className="mt-4 grid gap-4">
+               <Field label={t("Email address")} type="email" value={form.email || form.identifier} onChange={(e: any) => update(form.identifier ? "identifier" : "email", e.target.value)} required />
+              {error && <div className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]">{error}</div>}
+              <Button type="submit" className="mt-2 h-12 w-full" disabled={isForgotRequestPending}>{isForgotRequestPending ? t("Sending...") : t("Send OTP")}</Button>
+            </form>
+          )}
+
+          {step === "forgot-password-otp" && (
+            <form onSubmit={(e) => { e.preventDefault(); setError(""); forgotPasswordVerify({ email: form.email || form.identifier, otp: form.otp }); }} className="mt-4 grid gap-4">
+               <Field label={t("6-Digit OTP")} value={form.otp} onChange={(e: any) => update("otp", e.target.value)} placeholder="123456" required />
+              {error && <div className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]">{error}</div>}
+              <Button type="submit" className="mt-2 h-12 w-full" disabled={isForgotVerifyPending}>{isForgotVerifyPending ? t("Verifying...") : t("Verify OTP")}</Button>
+            </form>
+          )}
+
+          {step === "forgot-password-reset" && (
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (form.password !== form.confirmPassword) {
+                setError("Passwords do not match");
+                return;
+              }
+              setError("");
+              forgotPasswordReset({ email: form.email || form.identifier, otp: form.otp, newPassword: form.password });
+            }} className="mt-4 grid gap-4">
+              <Field label={t("New Password")} type="password" value={form.password} onChange={(e: any) => update("password", e.target.value)} required minLength={8} />
+              <Field label={t("Confirm Password")} type="password" value={form.confirmPassword} onChange={(e: any) => update("confirmPassword", e.target.value)} required minLength={8} />
+              {error && <div className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]">{error}</div>}
+              <Button type="submit" className="mt-2 h-12 w-full" disabled={isForgotResetPending}>{isForgotResetPending ? t("Resetting...") : t("Reset Password")}</Button>
+            </form>
+          )}
+
+          {(isSignIn || step === "form") && !step.startsWith("forgot-password") && (
+            <>
+              {!isSignIn && (
+            <Field
+              label={t("Your name")}
+              autoComplete="name"
+              value={form.name}
+              onChange={(e: any) => update("name", e.target.value)}
+              placeholder="Meera Krishnan"
+              required
+              data-testid="input-name"
+            />
+          )}
+          <form onSubmit={submit} className="mt-4 grid gap-4">
+            {isSignIn ? (
+              <Field
+                label={t("Email or account ID")}
+                autoComplete="username"
+                value={form.identifier}
+                onChange={(e: any) => update("identifier", e.target.value)}
+                placeholder="you@example.com"
+                required
+                data-testid="input-identifier"
+              />
+            ) : (
+              <Field
+                label={t("Email address")}
+                type="email"
+                autoComplete="email"
+                value={form.email}
+                onChange={(e: any) => update("email", e.target.value)}
+                placeholder="you@example.com"
+                required
+                data-testid="input-email"
+              />
+            )}
+            <Field
+              label={t("Password")}
+              type="password"
+              autoComplete={isSignIn ? "current-password" : "new-password"}
+              value={form.password}
+              onChange={(e: any) => update("password", e.target.value)}
+              placeholder="8 characters minimum"
+              required
+              minLength={8}
+              data-testid="input-password"
+            />
+            {isSignIn && (
+              <div className="text-right -mt-2">
+                <button type="button" onClick={() => { setStep("forgot-password-email"); setError(""); }} className="text-xs font-semibold text-accent hover:underline">
+                  {t("Forgot password?")}
+                </button>
+              </div>
+            )}
+            {!isSignIn && accountRole === "lawyer" && (
+              <div className="grid gap-4 rounded-2xl border border-accent/25 bg-secondary/35 p-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <div className="text-sm font-bold text-primary">
+                    {t("Lawyer application")}
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {t(
+                      "Your application starts as pending verification. Use fictional sample data for this academic prototype.",
+                    )}
+                  </p>
+                </div>
+                <Field
+                  label={t("Council / registration number")}
+                  value={form.sampleRegistrationNumber}
+                  onChange={(e: any) =>
+                    update("sampleRegistrationNumber", e.target.value)
+                  }
+                  placeholder="TN-DEMO-2026-014"
+                  required
+                  data-testid="input-lawyer-council-number"
+                />
+                <Field
+                  label={t("Dummy verification document")}
+                  value={form.verificationDocumentName}
+                  onChange={(e: any) =>
+                    update("verificationDocumentName", e.target.value)
+                  }
+                  placeholder="bar-council-certificate-demo.pdf"
+                  required
+                  data-testid="input-lawyer-document"
+                />
+                <Field
+                  label={t("Specialization")}
+                  value={form.specialization}
+                  onChange={(e: any) =>
+                    update("specialization", e.target.value)
+                  }
+                  required
+                  data-testid="input-lawyer-specialization"
+                />
+                <Field
+                  label={t("Location")}
+                  value={form.location}
+                  onChange={(e: any) => update("location", e.target.value)}
+                  required
+                  data-testid="input-lawyer-location"
+                />
+                <Field
+                  label={t("Languages")}
+                  value={form.languages}
+                  onChange={(e: any) => update("languages", e.target.value)}
+                  placeholder="Tamil, English"
+                  required
+                  data-testid="input-lawyer-languages"
+                />
+                <Field
+                  label={t("Experience (years)")}
+                  type="number"
+                  min="0"
+                  value={form.experience}
+                  onChange={(e: any) => update("experience", e.target.value)}
+                  required
+                  data-testid="input-lawyer-experience"
+                />
+                <Field
+                  label={t("Availability")}
+                  value={form.availability}
+                  onChange={(e: any) => update("availability", e.target.value)}
+                  required
+                  data-testid="input-lawyer-availability"
+                />
+                <div className="sm:col-span-2 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                  <Info size={14} className="mt-0.5 shrink-0 text-accent" />
+                  {t(
+                    "The document is recorded by name only; no file bytes are uploaded in this prototype.",
+                  )}
+                </div>
+              </div>
+            )}
+            {error && (
+              <div
+                className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]"
+                data-testid="status-auth-error"
+              >
+                {error}
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="mt-2 h-12 w-full"
+              disabled={login.isPending || register.isPending}
+              data-testid="button-auth-submit"
+            >
+              {login.isPending || register.isPending
+                ? t("Opening your workspace…")
+                : t(
+                    isSignIn
+                      ? "Sign in"
+                      : accountRole === "lawyer"
+                        ? "Submit application"
+                        : "Create account",
+                  )}{" "}
+              <ArrowRight size={16} />
+            </Button>
+          </form>
+          <div className="my-7 flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="h-px flex-1 bg-border" />
+            {t("or explore a demo")}
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {["citizen", "lawyer", "admin"].map((role) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => {
+                  if (!isSignIn) {
+                    localStorage.setItem(demoRoleKey, role);
+                    setLocation("/sign-in");
+                    return;
+                  }
+                  fillDemo(role);
+                }}
+                className={cx(
+                  "rounded-xl border px-3 py-3 text-left text-xs font-bold capitalize",
+                  demo === role
+                    ? "border-accent bg-accent/15 text-primary"
+                    : "border-border bg-card hover:border-accent/60",
+                )}
+                data-testid={`button-demo-${role}`}
+              >
+                {t(role)}
+                <span className="mt-1 block text-[10px] font-normal text-muted-foreground">
+                  {t(
+                    role === "citizen"
+                      ? "Track a case"
+                      : role === "lawyer"
+                        ? "Answer questions"
+                        : "Steward data",
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+          {isSignIn && (
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              {t("Select a role above to pre-fill its fictional demo account.")}
+            </p>
+          )}
+
+          </>
+          )}
+
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            {t(
+              isSignIn ? "New to Justice Connect?" : "Already have an account?",
+            )}{" "}
+            <Link
+              href={isSignIn ? "/sign-up" : "/sign-in"}
+              className="font-bold text-primary underline underline-offset-4"
+              data-testid="link-auth-switch"
+            >
+              {t(isSignIn ? "Create one" : "Sign in")}
+            </Link>
+          </p>
+          <PrototypeNote />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function PageHead({ eyebrow, title, description, action }: any) { const t = useCopy(); return <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="jc-mono text-[11px] font-bold uppercase tracking-[.18em] text-[#3e8b73]">{t(eyebrow)}</div><h1 className="jc-serif mt-2 text-4xl font-bold tracking-tight text-primary md:text-5xl">{t(title)}</h1>{description && <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">{t(description)}</p>}</div>{action}</div>; }
+function PageHead({ eyebrow, title, description, action }: any) {
+  const t = useCopy();
+  return (
+    <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <div>
+        <div className="jc-mono text-[11px] font-bold uppercase tracking-[.18em] text-[#3e8b73]">
+          {t(eyebrow)}
+        </div>
+        <h1 className="jc-serif mt-2 text-4xl font-bold tracking-tight text-primary md:text-5xl">
+          {t(title)}
+        </h1>
+        {description && (
+          <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">
+            {t(description)}
+          </p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
 
-function SummaryCards({ data, role }: any) { const t = useCopy(); const items = role === 'admin' ? [['Citizens', data?.totalCitizens ?? 128, Users, 'blue'], ['Lawyers', data?.totalLawyers ?? 24, Scale, 'good'], ['Open cases', data?.activeCases ?? 63, BriefcaseBusiness, 'warn'], ['Needs attention', data?.complaints ?? 9, CircleAlert, 'alert']] : [['Active cases', data?.activeCases ?? 3, BriefcaseBusiness, 'blue'], ['Upcoming hearings', data?.upcomingHearings ?? 2, CalendarDays, 'warn'], ['Questions waiting', data?.pendingQuestions ?? 1, MessageCircleQuestion, 'good'], ['Notifications', data?.notifications ?? 4, Bell, 'neutral']]; return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{items.map(([label, value, Icon, tone]: any, i: number) => <Card className="relative overflow-hidden p-5" key={label}><div className="flex items-start justify-between"><div><div className="text-sm text-muted-foreground">{t(label)}</div><div className="mt-2 text-3xl font-bold tracking-tight text-primary">{value}</div></div><div className={cx('grid h-10 w-10 place-items-center rounded-xl', tone === 'blue' ? 'bg-[#dbe9eb] text-[#255c67]' : tone === 'good' ? 'bg-[#d9eee4] text-[#246047]' : tone === 'warn' ? 'bg-[#f7e7c2] text-[#795a17]' : tone === 'alert' ? 'bg-[#f8dbd4] text-[#8d372d]' : 'bg-secondary text-primary')}><Icon size={19} /></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-accent" style={{ width: `${[72, 46, 28, 58][i]}%` }} /></div></Card>)}</div>; }
+function SummaryCards({ data, role }: any) {
+  const [, setLocation] = useLocation();
+  const t = useCopy();
+  const items =
+        role === "admin"
+      ? [
+          ["Citizens", data?.totalCitizens ?? 128, Users, "blue", "/admin/users"],
+          ["Lawyers", data?.totalLawyers ?? 24, Scale, "good", "/admin/lawyers"],
+          ["Open cases", data?.activeCases ?? 63, BriefcaseBusiness, "warn", "/admin/cases"],
+          ["Needs attention", data?.complaints ?? 9, CircleAlert, "alert", "/admin/complaints"],
+        ]
+      : [
+          ["Active cases", data?.activeCases ?? 3, BriefcaseBusiness, "blue", `/${role}/cases`],
+          [
+            "Upcoming hearings",
+            data?.upcomingHearings ?? 2,
+            CalendarDays,
+            "warn",
+            `/${role}/cases`
+          ],
+          [
+            "Questions waiting",
+            data?.pendingQuestions ?? 1,
+            MessageCircleQuestion,
+            "good",
+            `/${role}/questions`
+          ],
+          ["Notifications", data?.notifications ?? 4, Bell, "neutral", `/${role}`],
+        ];
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map(([label, value, Icon, tone, href]: any, i: number) => (
+        <Card
+          className="relative overflow-hidden p-5 cursor-pointer hover:border-accent transition-colors group"
+          key={label}
+          onClick={() => setLocation(href)}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground group-hover:text-primary transition-colors">{t(label)}</div>
+              <div className="mt-2 text-3xl font-bold tracking-tight text-primary">
+                {value}
+              </div>
+            </div>
+            <div
+              className={cx(
+                "grid h-10 w-10 place-items-center rounded-xl transition-colors",
+                tone === "blue"
+                  ? "bg-[#dbe9eb] text-[#255c67] group-hover:bg-[#c2dce0]"
+                  : tone === "good"
+                    ? "bg-[#d9eee4] text-[#246047] group-hover:bg-[#bfe6d3]"
+                    : tone === "warn"
+                      ? "bg-[#f7e7c2] text-[#795a17] group-hover:bg-[#f1d8a3]"
+                      : tone === "alert"
+                        ? "bg-[#f8dbd4] text-[#8d372d] group-hover:bg-[#f3c1b6]"
+                        : "bg-secondary text-primary group-hover:bg-accent group-hover:text-white",
+              )}
+            >
+              <Icon size={19} />
+            </div>
+          </div>
+          <div className="mt-4 h-1 overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full bg-accent"
+              style={{ width: `${[72, 46, 28, 58][i]}%` }}
+            />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
-function LegacyDashboard({ role }: { role: string }) { const summary = useGetDashboardSummary(); const cases = useListCases(); const questions = useListQuestions(); const notifications = useListNotifications(); const complaints = useListComplaints(); const data: any = summary.data; const list: any[] = cases.data || []; return <><PageHead eyebrow={`${role} workspace`} title={role === 'citizen' ? 'Good morning, Meera.' : role === 'lawyer' ? 'Your practice desk.' : 'A clear view of the network.'} description={role === 'citizen' ? 'Here is what needs your attention, and what can wait.' : role === 'lawyer' ? 'A focused view of the people and questions in your care.' : 'Keep the system legible, responsive, and human.'} action={<Button onClick={() => window.scrollTo({ top: 550, behavior: 'smooth' })} data-testid="button-dashboard-focus"><Activity size={16} />Today’s focus</Button>} /><SummaryCards data={data} role={role} /><div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_.85fr]"><Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-serif text-xl font-bold text-primary">{role === 'admin' ? 'Cases needing a closer look' : 'Your case pulse'}</h2><p className="mt-1 text-sm text-muted-foreground">Updated just now · sample records</p></div><Link href={`/${role}/cases`} className="text-sm font-bold text-primary" data-testid="link-dashboard-cases">See all <ArrowRight className="ml-1 inline" size={14} /></Link></div>{cases.isLoading ? <Loading /> : list.length ? <div className="divide-y divide-border">{list.slice(0, 4).map((item: any) => <CaseRow key={item.id} item={item} />)}</div> : <div className="p-6"><Empty icon={BriefcaseBusiness} title="No cases here yet" message="When a case is assigned or added, it will appear in this view." /></div>}</Card><div className="grid gap-6"><Card className="p-5"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold text-primary">Next on the calendar</h2><CalendarDays size={18} className="text-accent" /></div><div className="mt-5 flex gap-4 border-l-2 border-accent pl-4"><div><div className="jc-mono text-xs text-[#3e8b73]">12 SEP</div><div className="mt-1 font-bold">District Court · 10:30</div><div className="mt-1 text-sm text-muted-foreground">Property boundary review</div></div></div><Link href={`/${role}/cases`} className="mt-5 block text-sm font-bold text-primary underline underline-offset-4" data-testid="link-calendar-cases">Open case calendar</Link></Card><Card className="p-5"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold text-primary">A small reminder</h2><Sparkles size={18} className="text-accent" /></div><p className="mt-3 text-sm leading-6 text-muted-foreground">Keep copies of anything you submit. A simple folder with dates and names can make the next conversation easier.</p><div className="mt-4 text-xs font-bold text-[#3e8b73]">Organize before you rush</div></Card></div></div>{role === 'citizen' && <div className="mt-7 rounded-2xl bg-[#dbe9eb] p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#255c67]">Need a plain-language start?</div><h2 className="jc-serif mt-2 text-2xl font-bold text-primary">Try the document explainer</h2><p className="mt-1 text-sm text-primary/65">See a fictional sample notice explained in three useful layers.</p></div><Link href="/citizen/explainer" className="inline-flex items-center gap-2 font-bold text-primary" data-testid="link-dashboard-explainer">Open explainer <ArrowRight size={16} /></Link></div></div>}<PrototypeNote /></>; }
+function LegacyDashboard({ role }: { role: string }) {
+  const summary = useGetDashboardSummary();
+  const cases = useListCases();
+  const questions = useListQuestions();
+  const notifications = useListNotifications();
+  const complaints = useListComplaints();
+  const data: any = summary.data;
+  const list: any[] = cases.data || [];
+  return (
+    <>
+      <PageHead
+        eyebrow={`${role} workspace`}
+        title={
+          role === "citizen"
+            ? "Good morning, Meera."
+            : role === "lawyer"
+              ? "Your practice desk."
+              : "A clear view of the network."
+        }
+        description={
+          role === "citizen"
+            ? "Here is what needs your attention, and what can wait."
+            : role === "lawyer"
+              ? "A focused view of the people and questions in your care."
+              : "Keep the system legible, responsive, and human."
+        }
+        action={
+          <Button
+            onClick={() => window.scrollTo({ top: 550, behavior: "smooth" })}
+            data-testid="button-dashboard-focus"
+          >
+            <Activity size={16} />
+            Today’s focus
+          </Button>
+        }
+      />
+      <SummaryCards data={data} role={role} />
+      <div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <h2 className="font-serif text-xl font-bold text-primary">
+                {role === "admin"
+                  ? "Cases needing a closer look"
+                  : "Your case pulse"}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Updated just now · sample records
+              </p>
+            </div>
+            <Link
+              href={`/${role}/cases`}
+              className="text-sm font-bold text-primary"
+              data-testid="link-dashboard-cases"
+            >
+              See all <ArrowRight className="ml-1 inline" size={14} />
+            </Link>
+          </div>
+          {cases.isLoading ? (
+            <Loading />
+          ) : list.length ? (
+            <div className="divide-y divide-border">
+              {list.slice(0, 4).map((item: any) => (
+                <CaseRow key={item.id} item={item} />
+              ))}
+            </div>
+          ) : (
+            <div className="p-6">
+              <Empty
+                icon={BriefcaseBusiness}
+                title="No cases here yet"
+                message="When a case is assigned or added, it will appear in this view."
+              />
+            </div>
+          )}
+        </Card>
+        <div className="grid gap-6">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-xl font-bold text-primary">
+                Next on the calendar
+              </h2>
+              <CalendarDays size={18} className="text-accent" />
+            </div>
+            <div className="mt-5 flex gap-4 border-l-2 border-accent pl-4">
+              <div>
+                <div className="jc-mono text-xs text-[#3e8b73]">12 SEP</div>
+                <div className="mt-1 font-bold">District Court · 10:30</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Property boundary review
+                </div>
+              </div>
+            </div>
+            <Link
+              href={`/${role}/cases`}
+              className="mt-5 block text-sm font-bold text-primary underline underline-offset-4"
+              data-testid="link-calendar-cases"
+            >
+              Open case calendar
+            </Link>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-xl font-bold text-primary">
+                A small reminder
+              </h2>
+              <Sparkles size={18} className="text-accent" />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Keep copies of anything you submit. A simple folder with dates and
+              names can make the next conversation easier.
+            </p>
+            <div className="mt-4 text-xs font-bold text-[#3e8b73]">
+              Organize before you rush
+            </div>
+          </Card>
+        </div>
+      </div>
+      {role === "citizen" && (
+        <div className="mt-7 rounded-2xl bg-[#dbe9eb] p-6">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#255c67]">
+                Need a plain-language start?
+              </div>
+              <h2 className="jc-serif mt-2 text-2xl font-bold text-primary">
+                Try the document explainer
+              </h2>
+              <p className="mt-1 text-sm text-primary/65">
+                See a fictional sample notice explained in three useful layers.
+              </p>
+            </div>
+            <Link
+              href="/citizen/explainer"
+              className="inline-flex items-center gap-2 font-bold text-primary"
+              data-testid="link-dashboard-explainer"
+            >
+              Open explainer <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      )}
+      <PrototypeNote />
+    </>
+  );
+}
 
-function Dashboard({ role }: { role: string }) { const t = useCopy(); const summary = useGetDashboardSummary(); const cases = useListCases(); const data: any = summary.data; const list: any[] = cases.data || []; const title = role === 'citizen' ? 'Good morning, Meera.' : role === 'lawyer' ? 'Your practice desk.' : 'A clear view of the network.'; const description = role === 'citizen' ? 'Here is what needs your attention, and what can wait.' : role === 'lawyer' ? 'A focused view of the people and questions in your care.' : 'Keep the system legible, responsive, and human.'; return <><PageHead eyebrow={`${role} workspace`} title={title} description={description} action={<Button onClick={() => window.scrollTo({ top: 550, behavior: 'smooth' })} data-testid="button-dashboard-focus"><Activity size={16} />{t('Today’s focus')}</Button>} /><SummaryCards data={data} role={role} /><div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_.85fr]"><Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-serif text-xl font-bold text-primary">{t(role === 'admin' ? 'Cases needing a closer look' : 'Your case pulse')}</h2><p className="mt-1 text-sm text-muted-foreground">{t('Updated just now · sample records')}</p></div><Link href={`/${role}/cases`} className="text-sm font-bold text-primary" data-testid="link-dashboard-cases">{t('See all')} <ArrowRight className="ml-1 inline" size={14} /></Link></div>{cases.isLoading ? <Loading /> : list.length ? <div className="divide-y divide-border">{list.slice(0, 4).map((item: any) => <CaseRow key={item.id} item={item} />)}</div> : <div className="p-6"><Empty icon={BriefcaseBusiness} title={t('No cases here yet')} message={t('When a case is assigned or added, it will appear in this view.')} /></div>}</Card><div className="grid gap-6"><Card className="p-5"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold text-primary">{t('Next on the calendar')}</h2><CalendarDays size={18} className="text-accent" /></div><div className="mt-5 flex gap-4 border-l-2 border-accent pl-4"><div><div className="jc-mono text-xs text-[#3e8b73]">{t('12 SEP')}</div><div className="mt-1 font-bold">{t('District Court')} · 10:30</div><div className="mt-1 text-sm text-muted-foreground">{t('Property boundary review')}</div></div></div><Link href={`/${role}/cases`} className="mt-5 block text-sm font-bold text-primary underline underline-offset-4" data-testid="link-calendar-cases">{t('Open case calendar')}</Link></Card><Card className="p-5"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold text-primary">{t('A small reminder')}</h2><Sparkles size={18} className="text-accent" /></div><p className="mt-3 text-sm leading-6 text-muted-foreground">{t('Keep copies of anything you submit. A simple folder with dates and names can make the next conversation easier.')}</p><div className="mt-4 text-xs font-bold text-[#3e8b73]">{t('Organize before you rush')}</div></Card></div></div>{role === 'citizen' && <div className="mt-7 rounded-2xl bg-[#dbe9eb] p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#255c67]">{t('Need a plain-language start?')}</div><h2 className="jc-serif mt-2 text-2xl font-bold text-primary">{t('Try the document explainer')}</h2><p className="mt-1 text-sm text-primary/65">{t('See a fictional sample notice explained in three useful layers.')}</p></div><Link href="/citizen/explainer" className="inline-flex items-center gap-2 font-bold text-primary" data-testid="link-dashboard-explainer">{t('Open explainer')} <ArrowRight size={16} /></Link></div></div>}<PrototypeNote /></>; }
+function Dashboard({ role }: { role: string }) {
+  const t = useCopy();
+  const summary = useGetDashboardSummary();
+  const cases = useListCases();
+  const data: any = summary.data;
+  const list: any[] = cases.data || [];
+  const title =
+    role === "citizen"
+      ? "Good morning, Meera."
+      : role === "lawyer"
+        ? "Your practice desk."
+        : "A clear view of the network.";
+  const description =
+    role === "citizen"
+      ? "Here is what needs your attention, and what can wait."
+      : role === "lawyer"
+        ? "A focused view of the people and questions in your care."
+        : "Keep the system legible, responsive, and human.";
+  return (
+    <>
+      <PageHead
+        eyebrow={`${role} workspace`}
+        title={title}
+        description={description}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {role === "citizen" && (
+              <>
+                <Link href="/citizen/submit-case">
+                  <Button data-testid="button-dashboard-submit-case">
+                    <Plus size={16} />
+                    {t("Submit a Case")}
+                  </Button>
+                </Link>
+                <Link href="/citizen/appointments">
+                  <Button variant="outline" data-testid="button-dashboard-my-requests">
+                    <BriefcaseBusiness size={16} />
+                    {t("My Requests")}
+                  </Button>
+                </Link>
+              </>
+            )}
+            {role === "lawyer" && (
+              <Link href="/lawyer/appointments">
+                <Button variant="outline" data-testid="button-dashboard-appointments">
+                  <BriefcaseBusiness size={16} />
+                  {t("Appointment Orders")}
+                </Button>
+              </Link>
+            )}
+            <Button
+              variant={role === "citizen" ? "outline" : "primary"}
+              onClick={() => window.scrollTo({ top: 550, behavior: "smooth" })}
+              data-testid="button-dashboard-focus"
+            >
+              <Activity size={16} />
+              {t("Today’s focus")}
+            </Button>
+          </div>
+        }
+      />
+      <SummaryCards data={data} role={role} />
+      {role === "citizen" && (
+        <Card className="mt-6 border-accent/35 bg-gradient-to-r from-[#e7f1eb] via-card to-card p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="jc-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#3e8b73]">
+                {t("Citizen Intake")}
+              </div>
+              <h2 className="jc-serif mt-1 text-2xl font-bold text-primary">
+                {t("Submit a Case or Complaint")}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground max-w-xl">
+                {t(
+                  "Submit your case or complaint to receive a unique Justice Connect reference number for tracking.",
+                )}
+              </p>
+            </div>
+            <Link href="/citizen/submit-case" className="shrink-0">
+              <Button data-testid="button-card-submit-case">
+                <Plus size={16} />
+                {t("Start case submission")}
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      )}
+      <div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <h2 className="font-serif text-xl font-bold text-primary">
+                {t(
+                  role === "admin"
+                    ? "Cases needing a closer look"
+                    : "Your case pulse",
+                )}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("Updated just now · sample records")}
+              </p>
+            </div>
+            <Link
+              href={`/${role}/cases`}
+              className="text-sm font-bold text-primary"
+              data-testid="link-dashboard-cases"
+            >
+              {t("See all")} <ArrowRight className="ml-1 inline" size={14} />
+            </Link>
+          </div>
+          {cases.isLoading ? (
+            <Loading />
+          ) : list.length ? (
+            <div className="divide-y divide-border">
+              {list.slice(0, 4).map((item: any) => (
+                <CaseRow key={item.id} item={item} />
+              ))}
+            </div>
+          ) : (
+            <div className="p-6">
+              <Empty
+                icon={BriefcaseBusiness}
+                title={t("No cases here yet")}
+                message={t(
+                  "When a case is assigned or added, it will appear in this view.",
+                )}
+              />
+            </div>
+          )}
+        </Card>
+        <div className="grid gap-6">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-xl font-bold text-primary">
+                {t("Next on the calendar")}
+              </h2>
+              <CalendarDays size={18} className="text-accent" />
+            </div>
+            <div className="mt-5 flex gap-4 border-l-2 border-accent pl-4">
+              <div>
+                <div className="jc-mono text-xs text-[#3e8b73]">
+                  {t("12 SEP")}
+                </div>
+                <div className="mt-1 font-bold">
+                  {t("District Court")} · 10:30
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {t("Property boundary review")}
+                </div>
+              </div>
+            </div>
+            <Link
+              href={`/${role}/cases`}
+              className="mt-5 block text-sm font-bold text-primary underline underline-offset-4"
+              data-testid="link-calendar-cases"
+            >
+              {t("Open case calendar")}
+            </Link>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-xl font-bold text-primary">
+                {t("A small reminder")}
+              </h2>
+              <Sparkles size={18} className="text-accent" />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {t(
+                "Keep copies of anything you submit. A simple folder with dates and names can make the next conversation easier.",
+              )}
+            </p>
+            <div className="mt-4 text-xs font-bold text-[#3e8b73]">
+              {t("Organize before you rush")}
+            </div>
+          </Card>
+        </div>
+      </div>
+      {role === "citizen" && (
+        <div className="mt-7 rounded-2xl bg-[#dbe9eb] p-6">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#255c67]">
+                {t("Need a plain-language start?")}
+              </div>
+              <h2 className="jc-serif mt-2 text-2xl font-bold text-primary">
+                {t("Try the document explainer")}
+              </h2>
+              <p className="mt-1 text-sm text-primary/65">
+                {t(
+                  "See a fictional sample notice explained in three useful layers.",
+                )}
+              </p>
+            </div>
+            <Link
+              href="/citizen/explainer"
+              className="inline-flex items-center gap-2 font-bold text-primary"
+              data-testid="link-dashboard-explainer"
+            >
+              {t("Open explainer")} <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      )}
+      <PrototypeNote />
+    </>
+  );
+}
 
-function CaseRow({ item }: { item: any }) { const t = useCopy(); const workspace = window.location.pathname.startsWith('/lawyer') ? 'lawyer' : window.location.pathname.startsWith('/admin') ? 'admin' : 'citizen'; return <Link href={`/${workspace}/cases/${item.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/40" data-testid={`link-case-${item.id}`}><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><BriefcaseBusiness size={18} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="jc-mono text-[10px] text-muted-foreground">{item.caseNumber}</span><Badge tone={item.monitoringStatus === 'Needs Attention' ? 'warn' : 'good'}>{t(item.currentStatus)}</Badge></div><div className="mt-1 truncate font-bold text-primary">{item.title}</div><div className="mt-1 text-xs text-muted-foreground">{item.court} · {item.location}</div></div><div className="hidden text-right sm:block"><div className="text-xs text-muted-foreground">{t('Next hearing')}</div><div className="mt-1 text-sm font-bold text-primary">{fmt(item.nextHearing)}</div></div><ChevronRight size={17} className="text-muted-foreground" /></Link>; }
+function CaseRow({ item }: { item: any }) {
+  const t = useCopy();
+  const workspace = window.location.pathname.startsWith("/lawyer")
+    ? "lawyer"
+    : window.location.pathname.startsWith("/admin")
+      ? "admin"
+      : "citizen";
+  return (
+    <Link
+      href={`/${workspace}/cases/${item.id}`}
+      className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/40"
+      data-testid={`link-case-${item.id}`}
+    >
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
+        <BriefcaseBusiness size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="jc-mono text-[10px] text-muted-foreground">
+            {item.caseNumber}
+          </span>
+          <Badge
+            tone={item.monitoringStatus === "Needs Attention" ? "warn" : "good"}
+          >
+            {t(item.currentStatus)}
+          </Badge>
+        </div>
+        <div className="mt-1 truncate font-bold text-primary">{item.title}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {item.court} · {item.location}
+        </div>
+      </div>
+      <div className="hidden text-right sm:block">
+        <div className="text-xs text-muted-foreground">{t("Next hearing")}</div>
+        <div className="mt-1 text-sm font-bold text-primary">
+          {fmt(item.nextHearing)}
+        </div>
+      </div>
+      <ChevronRight size={17} className="text-muted-foreground" />
+    </Link>
+  );
+}
 
-function LegacyCasesPage({ role = 'citizen' }: { role?: string }) { const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const query: any = status ? { search: search || undefined, monitoringStatus: status } : { search: search || undefined }; const cases = useListCases(query); const createCase = useCreateCase(); const [show, setShow] = useState(false); const [form, setForm] = useState({ caseNumber: '', title: '', court: '', location: '', filingDate: '', currentStatus: 'Under review', monitoringStatus: 'Normal Monitoring' }); const submit = (e: any) => { e.preventDefault(); createCase.mutate({ data: form as any }, { onSuccess: () => { setShow(false); queryClient.invalidateQueries({ queryKey: getListCasesQueryKey() }); } }); }; const list: any[] = cases.data || []; return <><PageHead eyebrow={`${role} / cases`} title={role === 'admin' ? 'Case management' : 'Your cases'} description="One calm view of the records currently visible to this workspace." action={role === 'admin' && <Button onClick={() => setShow(!show)} data-testid="button-add-case"><Plus size={16} />Add sample case</Button>} />{show && <Card className="mb-6 p-5"><form onSubmit={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label="Case number" value={form.caseNumber} onChange={(e: any) => setForm({ ...form, caseNumber: e.target.value })} required data-testid="input-case-number" /><Field label="Case title" value={form.title} onChange={(e: any) => setForm({ ...form, title: e.target.value })} required data-testid="input-case-title" /><Field label="Court" value={form.court} onChange={(e: any) => setForm({ ...form, court: e.target.value })} required data-testid="input-case-court" /><Field label="Location" value={form.location} onChange={(e: any) => setForm({ ...form, location: e.target.value })} required data-testid="input-case-location" /><Field label="Filing date" type="date" value={form.filingDate} onChange={(e: any) => setForm({ ...form, filingDate: e.target.value })} required data-testid="input-case-date" /><div className="flex items-end"><Button type="submit" disabled={createCase.isPending} data-testid="button-save-case"><Check size={16} />Save case</Button></div></form></Card>}<Card className="overflow-hidden"><div className="flex flex-col gap-3 border-b border-border bg-secondary/35 p-4 sm:flex-row"><div className="relative flex-1"><Search size={17} className="absolute left-3 top-3 text-muted-foreground" /><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by title, case number, or place" className="h-11 w-full rounded-xl border border-input bg-card pl-10 pr-3 outline-none focus:border-accent" data-testid="input-search-cases" /></div><select value={status} onChange={e => setStatus(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-accent" data-testid="select-case-status"><option value="">All monitoring</option><option value="Normal Monitoring">Normal monitoring</option><option value="Needs Attention">Needs attention</option><option value="Long-Pending">Long-pending</option></select></div>{cases.isLoading ? <Loading rows={5} /> : cases.isError ? <div className="p-5"><ErrorState message="Cases are temporarily unavailable." /></div> : list.length ? <div className="divide-y divide-border">{list.map(item => <CaseRow item={item} key={item.id} />)}</div> : <div className="p-6"><Empty icon={BriefcaseBusiness} title="No matching cases" message="Try another search or clear the monitoring filter." /></div>}</Card><PrototypeNote /></>; }
+function LegacyCasesPage({ role = "citizen" }: { role?: string }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const query: any = status
+    ? { search: search || undefined, monitoringStatus: status }
+    : { search: search || undefined };
+  const cases = useListCases(query);
+  const createCase = useCreateCase();
+  const [show, setShow] = useState(false);
+  const [form, setForm] = useState({
+    caseNumber: "",
+    title: "",
+    court: "",
+    location: "",
+    filingDate: "",
+    currentStatus: "Under review",
+    monitoringStatus: "Normal Monitoring",
+  });
+  const submit = (e: any) => {
+    e.preventDefault();
+    createCase.mutate(
+      { data: form as any },
+      {
+        onSuccess: () => {
+          setShow(false);
+          queryClient.invalidateQueries({ queryKey: getListCasesQueryKey() });
+        },
+      },
+    );
+  };
+  const list: any[] = cases.data || [];
+  return (
+    <>
+      <PageHead
+        eyebrow={`${role} / cases`}
+        title={role === "admin" ? "Case management" : "Your cases"}
+        description="One calm view of the records currently visible to this workspace."
+        action={
+          role === "admin" && (
+            <Button
+              onClick={() => setShow(!show)}
+              data-testid="button-add-case"
+            >
+              <Plus size={16} />
+              Add sample case
+            </Button>
+          )
+        }
+      />
+      {show && (
+        <Card className="mb-6 p-5">
+          <form
+            onSubmit={submit}
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <Field
+              label="Case number"
+              value={form.caseNumber}
+              onChange={(e: any) =>
+                setForm({ ...form, caseNumber: e.target.value })
+              }
+              required
+              data-testid="input-case-number"
+            />
+            <Field
+              label="Case title"
+              value={form.title}
+              onChange={(e: any) => setForm({ ...form, title: e.target.value })}
+              required
+              data-testid="input-case-title"
+            />
+            <Field
+              label="Court"
+              value={form.court}
+              onChange={(e: any) => setForm({ ...form, court: e.target.value })}
+              required
+              data-testid="input-case-court"
+            />
+            <Field
+              label="Location"
+              value={form.location}
+              onChange={(e: any) =>
+                setForm({ ...form, location: e.target.value })
+              }
+              required
+              data-testid="input-case-location"
+            />
+            <Field
+              label="Filing date"
+              type="date"
+              value={form.filingDate}
+              onChange={(e: any) =>
+                setForm({ ...form, filingDate: e.target.value })
+              }
+              required
+              data-testid="input-case-date"
+            />
+            <div className="flex items-end">
+              <Button
+                type="submit"
+                disabled={createCase.isPending}
+                data-testid="button-save-case"
+              >
+                <Check size={16} />
+                Save case
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-border bg-secondary/35 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search
+              size={17}
+              className="absolute left-3 top-3 text-muted-foreground"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by title, case number, or place"
+              className="h-11 w-full rounded-xl border border-input bg-card pl-10 pr-3 outline-none focus:border-accent"
+              data-testid="input-search-cases"
+            />
+          </div>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-11 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-accent"
+            data-testid="select-case-status"
+          >
+            <option value="">All monitoring</option>
+            <option value="Normal Monitoring">Normal monitoring</option>
+            <option value="Needs Attention">Needs attention</option>
+            <option value="Long-Pending">Long-pending</option>
+          </select>
+        </div>
+        {cases.isLoading ? (
+          <Loading rows={5} />
+        ) : cases.isError ? (
+          <div className="p-5">
+            <ErrorState message="Cases are temporarily unavailable." />
+          </div>
+        ) : list.length ? (
+          <div className="divide-y divide-border">
+            {list.map((item) => (
+              <CaseRow item={item} key={item.id} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-6">
+            <Empty
+              icon={BriefcaseBusiness}
+              title="No matching cases"
+              message="Try another search or clear the monitoring filter."
+            />
+          </div>
+        )}
+      </Card>
+      <PrototypeNote />
+    </>
+  );
+}
 
-function CasesPage({ role = 'citizen' }: { role?: string }) { const t = useCopy(); const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const query: any = status ? { search: search || undefined, monitoringStatus: status } : { search: search || undefined }; const cases = useListCases(query); const createCase = useCreateCase(); const [show, setShow] = useState(false); const [form, setForm] = useState({ caseNumber: '', title: '', court: '', location: '', filingDate: '', currentStatus: 'Under review', monitoringStatus: 'Normal Monitoring' }); const submit = (e: any) => { e.preventDefault(); createCase.mutate({ data: form as any }, { onSuccess: () => { setShow(false); queryClient.invalidateQueries({ queryKey: getListCasesQueryKey() }); } }); }; const list: any[] = cases.data || []; return <><PageHead eyebrow={`${role} / cases`} title={role === 'admin' ? 'Case management' : 'Your cases'} description="One calm view of the records currently visible to this workspace." action={role === 'admin' && <Button onClick={() => setShow(!show)} data-testid="button-add-case"><Plus size={16} />{t('Add sample case')}</Button>} />{show && <Card className="mb-6 p-5"><form onSubmit={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label={t('Case number')} value={form.caseNumber} onChange={(e: any) => setForm({ ...form, caseNumber: e.target.value })} required data-testid="input-case-number" /><Field label={t('Case title')} value={form.title} onChange={(e: any) => setForm({ ...form, title: e.target.value })} required data-testid="input-case-title" /><Field label={t('Court')} value={form.court} onChange={(e: any) => setForm({ ...form, court: e.target.value })} required data-testid="input-case-court" /><Field label={t('Location')} value={form.location} onChange={(e: any) => setForm({ ...form, location: e.target.value })} required data-testid="input-case-location" /><Field label={t('Filing date')} type="date" value={form.filingDate} onChange={(e: any) => setForm({ ...form, filingDate: e.target.value })} required data-testid="input-case-date" /><div className="flex items-end"><Button type="submit" disabled={createCase.isPending} data-testid="button-save-case"><Check size={16} />{t('Save case')}</Button></div></form></Card>}<Card className="overflow-hidden"><div className="flex flex-col gap-3 border-b border-border bg-secondary/35 p-4 sm:flex-row"><div className="relative flex-1"><Search size={17} className="absolute left-3 top-3 text-muted-foreground" /><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('Search by title, case number, or place')} className="h-11 w-full rounded-xl border border-input bg-card pl-10 pr-3 outline-none focus:border-accent" data-testid="input-search-cases" /></div><select value={status} onChange={e => setStatus(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-accent" data-testid="select-case-status"><option value="">{t('All monitoring')}</option><option value="Normal Monitoring">{t('Normal monitoring')}</option><option value="Needs Attention">{t('Needs attention')}</option><option value="Long-Pending">{t('Long-pending')}</option></select></div>{cases.isLoading ? <Loading rows={5} /> : cases.isError ? <div className="p-5"><ErrorState message={t('Cases are temporarily unavailable.')} /></div> : list.length ? <div className="divide-y divide-border">{list.map(item => <CaseRow item={item} key={item.id} />)}</div> : <div className="p-6"><Empty icon={BriefcaseBusiness} title={t('No matching cases')} message={t('Try another search or clear the monitoring filter.')} /></div>}</Card><PrototypeNote /></>; }
+function CasesPage({ role = "citizen" }: { role?: string }) {
+  const t = useCopy();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const query: any = status
+    ? { search: search || undefined, monitoringStatus: status }
+    : { search: search || undefined };
+  const cases = useListCases(query);
+  const createCase = useCreateCase();
+  const [show, setShow] = useState(false);
+  const [form, setForm] = useState({
+    caseNumber: "",
+    title: "",
+    court: "",
+    location: "",
+    filingDate: "",
+    currentStatus: "Under review",
+    monitoringStatus: "Normal Monitoring",
+  });
+  const submit = (e: any) => {
+    e.preventDefault();
+    createCase.mutate(
+      { data: form as any },
+      {
+        onSuccess: () => {
+          setShow(false);
+          queryClient.invalidateQueries({ queryKey: getListCasesQueryKey() });
+        },
+      },
+    );
+  };
+  const list: any[] = cases.data || [];
+  return (
+    <>
+      <PageHead
+        eyebrow={`${role} / cases`}
+        title={role === "admin" ? "Case management" : "Your cases"}
+        description="One calm view of the records currently visible to this workspace."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {role === "citizen" && (
+              <Link href="/citizen/submit-case">
+                <Button data-testid="button-cases-submit-case">
+                  <Plus size={16} />
+                  {t("Submit a Case")}
+                </Button>
+              </Link>
+            )}
+            {role === "admin" && (
+              <Button
+                onClick={() => setShow(!show)}
+                data-testid="button-add-case"
+              >
+                <Plus size={16} />
+                {t("Add sample case")}
+              </Button>
+            )}
+          </div>
+        }
+      />
+      {show && (
+        <Card className="mb-6 p-5">
+          <form
+            onSubmit={submit}
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <Field
+              label={t("Case number")}
+              value={form.caseNumber}
+              onChange={(e: any) =>
+                setForm({ ...form, caseNumber: e.target.value })
+              }
+              required
+              data-testid="input-case-number"
+            />
+            <Field
+              label={t("Case title")}
+              value={form.title}
+              onChange={(e: any) => setForm({ ...form, title: e.target.value })}
+              required
+              data-testid="input-case-title"
+            />
+            <Field
+              label={t("Court")}
+              value={form.court}
+              onChange={(e: any) => setForm({ ...form, court: e.target.value })}
+              required
+              data-testid="input-case-court"
+            />
+            <Field
+              label={t("Location")}
+              value={form.location}
+              onChange={(e: any) =>
+                setForm({ ...form, location: e.target.value })
+              }
+              required
+              data-testid="input-case-location"
+            />
+            <Field
+              label={t("Filing date")}
+              type="date"
+              value={form.filingDate}
+              onChange={(e: any) =>
+                setForm({ ...form, filingDate: e.target.value })
+              }
+              required
+              data-testid="input-case-date"
+            />
+            <div className="flex items-end">
+              <Button
+                type="submit"
+                disabled={createCase.isPending}
+                data-testid="button-save-case"
+              >
+                <Check size={16} />
+                {t("Save case")}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-border bg-secondary/35 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search
+              size={17}
+              className="absolute left-3 top-3 text-muted-foreground"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("Search by title, case number, or place")}
+              className="h-11 w-full rounded-xl border border-input bg-card pl-10 pr-3 outline-none focus:border-accent"
+              data-testid="input-search-cases"
+            />
+          </div>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-11 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-accent"
+            data-testid="select-case-status"
+          >
+            <option value="">{t("All monitoring")}</option>
+            <option value="Normal Monitoring">{t("Normal monitoring")}</option>
+            <option value="Needs Attention">{t("Needs attention")}</option>
+            <option value="Long-Pending">{t("Long-pending")}</option>
+          </select>
+        </div>
+        {cases.isLoading ? (
+          <Loading rows={5} />
+        ) : cases.isError ? (
+          <div className="p-5">
+            <ErrorState message={t("Cases are temporarily unavailable.")} />
+          </div>
+        ) : list.length ? (
+          <div className="divide-y divide-border">
+            {list.map((item) => (
+              <CaseRow item={item} key={item.id} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-6">
+            <Empty
+              icon={BriefcaseBusiness}
+              title={t("No matching cases")}
+              message={t("Try another search or clear the monitoring filter.")}
+            />
+          </div>
+        )}
+      </Card>
+      <PrototypeNote />
+    </>
+  );
+}
 
-function CaseDetailPage() { const { id } = useParams<{ id: string }>(); const caseId = Number(id); const workspace = window.location.pathname.startsWith('/lawyer') ? 'lawyer' : window.location.pathname.startsWith('/admin') ? 'admin' : 'citizen'; const result: any = useGetCase(caseId, { query: { enabled: Boolean(caseId), queryKey: getGetCaseQueryKey(caseId) } }); const hearings = useListHearings(caseId, { query: { enabled: Boolean(caseId), queryKey: getListHearingsQueryKey(caseId) } }); const docs = useListDocuments(caseId, { query: { enabled: Boolean(caseId), queryKey: getListDocumentsQueryKey(caseId) } }); const [tab, setTab] = useState('overview'); const [message, setMessage] = useState(''); const update = useUpdateCase(); const createHearing = useCreateHearing(); const item: any = result.data; if (result.isLoading) return <><PageHead eyebrow="case file" title="Loading case…" /><Loading rows={4} /></>; if (result.isError) return <ErrorState message="This case could not be loaded." />; if (!item) return <Empty icon={FileText} title="Case not found" message="This sample record may have moved or is not visible to your account." />; const hearingList: any[] = item.hearings || hearings.data || []; const docList: any[] = item.documents || docs.data || []; const saveStatus = (next: string) => update.mutate({ id: caseId, data: { currentStatus: next } as any }, { onSuccess: () => setMessage('Case status saved.') }); return <><Link href={`/${workspace}/cases`} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary" data-testid="link-back-cases"><ArrowLeft size={15} />All cases</Link><PageHead eyebrow={`case ${item.caseNumber}`} title={item.title} description={`${item.court} · ${item.location} · Filed ${fmt(item.filingDate)}`} action={<Badge tone={item.monitoringStatus === 'Needs Attention' ? 'warn' : 'good'}>{item.monitoringStatus}</Badge>} /><div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]"><Card className="overflow-hidden"><div className="flex border-b border-border px-3 pt-3"><button onClick={() => setTab('overview')} className={cx('border-b-2 px-3 py-3 text-sm font-bold', tab === 'overview' ? 'border-accent text-primary' : 'border-transparent text-muted-foreground')} data-testid="button-tab-overview">Overview</button><button onClick={() => setTab('hearings')} className={cx('border-b-2 px-3 py-3 text-sm font-bold', tab === 'hearings' ? 'border-accent text-primary' : 'border-transparent text-muted-foreground')} data-testid="button-tab-hearings">Hearings <span className="ml-1 rounded-full bg-secondary px-1.5 text-[10px]">{hearingList.length}</span></button><button onClick={() => setTab('documents')} className={cx('border-b-2 px-3 py-3 text-sm font-bold', tab === 'documents' ? 'border-accent text-primary' : 'border-transparent text-muted-foreground')} data-testid="button-tab-documents">Documents <span className="ml-1 rounded-full bg-secondary px-1.5 text-[10px]">{docList.length}</span></button></div>{tab === 'overview' && <div className="p-6"><div className="grid gap-5 sm:grid-cols-2">{[['Case number', item.caseNumber], ['Current status', item.currentStatus], ['Case age', item.caseAge], ['Lawyer', item.lawyerName || 'Not assigned'], ['Next hearing', fmt(item.nextHearing)], ['Filed on', fmt(item.filingDate)]].map(([l, v]) => <div key={l}><div className="text-xs text-muted-foreground">{l}</div><div className="mt-1 font-bold text-primary">{v}</div></div>)}</div><div className="mt-8 border-t border-border pt-6"><div className="flex items-center justify-between"><h3 className="font-serif text-xl font-bold">Update status</h3><span className="text-xs text-muted-foreground">{message}</span></div><div className="mt-3 flex flex-wrap gap-2">{['Under review', 'Hearing scheduled', 'Resolved'].map(s => <Button key={s} variant={item.currentStatus === s ? 'primary' : 'outline'} onClick={() => saveStatus(s)} data-testid={`button-status-${s.replaceAll(' ', '-')}`}>{s}</Button>)}</div></div></div>}{tab === 'hearings' && <div className="p-6">{hearingList.length ? <div className="relative ml-3 border-l border-border pl-7">{hearingList.map((h: any) => <div className="relative mb-7 last:mb-0" key={h.id}><span className="absolute -left-[35px] top-1 h-3 w-3 rounded-full border-2 border-card bg-accent" /><div className="jc-mono text-xs text-[#3e8b73]">{fmt(h.hearingDate)} · {h.time}</div><div className="mt-1 font-bold text-primary">{h.stage}</div><div className="mt-1 text-sm text-muted-foreground">{h.court || item.court} · {h.location || item.location}</div><Badge tone={h.result === 'Adjourned' ? 'warn' : 'good'}>{h.result}</Badge>{h.adjournmentReason && <p className="mt-2 text-sm text-muted-foreground">{h.adjournmentReason}</p>}</div>)}</div> : <Empty icon={CalendarDays} title="No hearings recorded" message="A hearing will appear here when one is added to this case." />}<Button className="mt-6" variant="outline" onClick={() => createHearing.mutate({ id: caseId, data: { hearingDate: new Date().toISOString(), time: '10:30', stage: 'Case review', result: 'Scheduled' } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListHearingsQueryKey(caseId) }) })} data-testid="button-add-hearing"><Plus size={16} />Add demo hearing</Button></div>}{tab === 'documents' && <div className="p-6">{docList.length ? <div className="grid gap-3">{docList.map((d: any) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-border p-3"><div className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-primary"><FileText size={17} /></div><div className="min-w-0 flex-1"><div className="truncate font-bold">{d.fileName}</div><div className="text-xs text-muted-foreground">{d.fileType} · {fmt(d.uploadedAt)}</div></div><ChevronRight size={16} className="text-muted-foreground" /></div>)}</div> : <Empty icon={FileText} title="No documents yet" message="Upload a record from the documents area to keep the case together." />}</div>}</Card><div className="grid content-start gap-6">{workspace !== 'admin' && <Card className="bg-primary p-6 text-primary-foreground"><div className="flex items-center gap-2 text-accent"><Sparkles size={16} /><span className="jc-mono text-[10px] uppercase tracking-[.14em]">A useful next step</span></div><h3 className="jc-serif mt-4 text-2xl font-bold">Write down the question you are carrying.</h3><p className="mt-3 text-sm leading-6 text-primary-foreground/65">Questions are easier to answer when they include a date, document name, or decision.</p><Link href={`/${workspace}/questions`} className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-accent" data-testid="link-case-question">Ask a lawyer <ArrowRight size={15} /></Link></Card>}<Card className="p-5"><div className="flex items-center gap-2 font-serif text-lg font-bold"><Info size={17} className="text-accent" />Keep your record current</div><p className="mt-3 text-sm leading-6 text-muted-foreground">This is a personal organization view, not a court record. Check official notices for authoritative dates.</p></Card></div></div><PrototypeNote /></>; }
+function CaseDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const t = useCopy();
+  const caseId = Number(id);
+  const workspace = window.location.pathname.startsWith("/lawyer")
+    ? "lawyer"
+    : window.location.pathname.startsWith("/admin")
+      ? "admin"
+      : "citizen";
+  const result: any = useGetCase(caseId, {
+    query: { enabled: Boolean(caseId), queryKey: getGetCaseQueryKey(caseId) },
+  });
+  const hearings = useListHearings(caseId, {
+    query: {
+      enabled: Boolean(caseId),
+      queryKey: getListHearingsQueryKey(caseId),
+    },
+  });
+  const docs = useListDocuments(caseId, {
+    query: {
+      enabled: Boolean(caseId),
+      queryKey: getListDocumentsQueryKey(caseId),
+    },
+  });
+  const [tab, setTab] = useState("overview");
+  const [message, setMessage] = useState("");
+  const update = useUpdateCase();
+  const createHearing = useCreateHearing();
+  const [showHearingForm, setShowHearingForm] = useState(false);
+  const [hearingForm, setHearingForm] = useState({ date: "", time: "10:00", stage: "Case review", court: "", location: "" });
+  const item: any = result.data;
+  if (result.isLoading)
+    return (
+      <>
+        <PageHead eyebrow="case file" title="Loading case…" />
+        <Loading rows={4} />
+      </>
+    );
+  if (result.isError)
+    return <ErrorState message="This case could not be loaded." />;
+  if (!item)
+    return (
+      <Empty
+        icon={FileText}
+        title="Case not found"
+        message="This sample record may have moved or is not visible to your account."
+      />
+    );
+  const hearingList: any[] = item.hearings || hearings.data || [];
+  const docList: any[] = item.documents || docs.data || [];
+  const saveStatus = (next: string) =>
+    update.mutate(
+      { id: caseId, data: { currentStatus: next } as any },
+      { onSuccess: () => setMessage("Case status saved.") },
+    );
+  return (
+    <>
+      <Link
+        href={`/${workspace}/cases`}
+        className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary"
+        data-testid="link-back-cases"
+      >
+        <ArrowLeft size={15} />
+        All cases
+      </Link>
+      <PageHead
+        eyebrow={`case ${item.caseNumber}`}
+        title={item.title}
+        description={`${item.court} · ${item.location} · Filed ${fmt(item.filingDate)}`}
+        action={
+          <Badge
+            tone={item.monitoringStatus === "Needs Attention" ? "warn" : "good"}
+          >
+            {item.monitoringStatus}
+          </Badge>
+        }
+      />
+      <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
+        <Card className="overflow-hidden">
+          <div className="flex border-b border-border px-3 pt-3">
+            <button
+              onClick={() => setTab("overview")}
+              className={cx(
+                "border-b-2 px-3 py-3 text-sm font-bold",
+                tab === "overview"
+                  ? "border-accent text-primary"
+                  : "border-transparent text-muted-foreground",
+              )}
+              data-testid="button-tab-overview"
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setTab("hearings")}
+              className={cx(
+                "border-b-2 px-3 py-3 text-sm font-bold",
+                tab === "hearings"
+                  ? "border-accent text-primary"
+                  : "border-transparent text-muted-foreground",
+              )}
+              data-testid="button-tab-hearings"
+            >
+              Hearings{" "}
+              <span className="ml-1 rounded-full bg-secondary px-1.5 text-[10px]">
+                {hearingList.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setTab("documents")}
+              className={cx(
+                "border-b-2 px-3 py-3 text-sm font-bold",
+                tab === "documents"
+                  ? "border-accent text-primary"
+                  : "border-transparent text-muted-foreground",
+              )}
+              data-testid="button-tab-documents"
+            >
+              Documents{" "}
+              <span className="ml-1 rounded-full bg-secondary px-1.5 text-[10px]">
+                {docList.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setTab("messages")}
+              className={cx(
+                "border-b-2 px-3 py-3 text-sm font-bold",
+                tab === "messages"
+                  ? "border-accent text-primary"
+                  : "border-transparent text-muted-foreground",
+              )}
+            >
+              Messages
+            </button>
+          </div>
+          {tab === "overview" && (
+            <div className="p-6">
+              <div className="grid gap-5 sm:grid-cols-2">
+                {[
+                  ["Case number", item.caseNumber],
+                  ["Current status", item.currentStatus],
+                  ["Case age", item.caseAge],
+                  ["Lawyer", item.lawyerName || "Not assigned"],
+                  ["Next hearing", fmt(item.nextHearing)],
+                  ["Filed on", fmt(item.filingDate)],
+                ].map(([l, v]) => (
+                  <div key={l}>
+                    <div className="text-xs text-muted-foreground">{l}</div>
+                    <div className="mt-1 font-bold text-primary">{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-8 border-t border-border pt-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-xl font-bold">
+                    Update status
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    {message}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {["Under review", "Hearing scheduled", "Resolved"].map(
+                    (s) => (
+                      <Button
+                        key={s}
+                        variant={
+                          item.currentStatus === s ? "primary" : "outline"
+                        }
+                        onClick={() => saveStatus(s)}
+                        data-testid={`button-status-${s.replaceAll(" ", "-")}`}
+                      >
+                        {s}
+                      </Button>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {tab === "hearings" && (
+            <div className="p-6">
+              {hearingList.length ? (
+                <div className="relative ml-3 border-l border-border pl-7">
+                  {hearingList.map((h: any) => (
+                    <div className="relative mb-7 last:mb-0" key={h.id}>
+                      <span className="absolute -left-[35px] top-1 h-3 w-3 rounded-full border-2 border-card bg-accent" />
+                      <div className="jc-mono text-xs text-[#3e8b73]">
+                        {fmt(h.hearingDate)} · {h.time}
+                      </div>
+                      <div className="mt-1 font-bold text-primary">
+                        {h.stage}
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {h.court || item.court} · {h.location || item.location}
+                      </div>
+                      <Badge tone={h.result === "Adjourned" ? "warn" : "good"}>
+                        {h.result}
+                      </Badge>
+                      {h.adjournmentReason && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {h.adjournmentReason}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  icon={CalendarDays}
+                  title="No hearings recorded"
+                  message="A hearing will appear here when one is added to this case."
+                />
+              )}
+              {workspace === "admin" && (
+                <div className="mt-6 border-t border-border pt-6">
+                  {!showHearingForm ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowHearingForm(true)}
+                      data-testid="button-add-hearing"
+                    >
+                      <Plus size={16} />
+                      {t("Allocate hearing date")}
+                    </Button>
+                  ) : (
+                    <div className="rounded-xl border border-border bg-card p-5">
+                      <h4 className="mb-4 font-bold">{t("Schedule New Hearing")}</h4>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          createHearing.mutate(
+                            {
+                              id: caseId,
+                              data: {
+                                hearingDate: new Date(hearingForm.date).toISOString(),
+                                time: hearingForm.time,
+                                stage: hearingForm.stage,
+                                court: hearingForm.court || undefined,
+                                location: hearingForm.location || undefined,
+                                result: "Scheduled",
+                              } as any,
+                            },
+                            {
+                              onSuccess: () => {
+                                queryClient.invalidateQueries({
+                                  queryKey: getListHearingsQueryKey(caseId),
+                                });
+                                setShowHearingForm(false);
+                              },
+                            }
+                          );
+                        }}
+                        className="grid gap-4 sm:grid-cols-2"
+                      >
+                        <label className="grid gap-1.5 text-sm font-semibold">
+                          {t("Date")}
+                          <input
+                            type="date"
+                            required
+                            className="h-11 rounded-xl border border-input px-3"
+                            value={hearingForm.date}
+                            onChange={(e) => setHearingForm({ ...hearingForm, date: e.target.value })}
+                            data-testid="input-hearing-date"
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm font-semibold">
+                          {t("Time")}
+                          <input
+                            type="time"
+                            required
+                            className="h-11 rounded-xl border border-input px-3"
+                            value={hearingForm.time}
+                            onChange={(e) => setHearingForm({ ...hearingForm, time: e.target.value })}
+                            data-testid="input-hearing-time"
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">
+                          {t("Stage")}
+                          <input
+                            type="text"
+                            required
+                            className="h-11 rounded-xl border border-input px-3"
+                            value={hearingForm.stage}
+                            onChange={(e) => setHearingForm({ ...hearingForm, stage: e.target.value })}
+                            placeholder="e.g. Initial Case Review"
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm font-semibold">
+                          {t("Court")}
+                          <input
+                            type="text"
+                            className="h-11 rounded-xl border border-input px-3"
+                            value={hearingForm.court}
+                            onChange={(e) => setHearingForm({ ...hearingForm, court: e.target.value })}
+                            placeholder="e.g. High Court"
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm font-semibold">
+                          {t("Place (Location)")}
+                          <input
+                            type="text"
+                            className="h-11 rounded-xl border border-input px-3"
+                            value={hearingForm.location}
+                            onChange={(e) => setHearingForm({ ...hearingForm, location: e.target.value })}
+                            placeholder="e.g. Chennai"
+                          />
+                        </label>
+                        <div className="flex gap-2 sm:col-span-2 mt-2">
+                          <Button type="submit" disabled={createHearing.isPending}>
+                            <Check size={16} />
+                            {t("Save Schedule")}
+                          </Button>
+                          <Button type="button" variant="quiet" onClick={() => setShowHearingForm(false)}>
+                            {t("Cancel")}
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {tab === "documents" && (
+            <div className="p-6">
+              {docList.length ? (
+                <div className="grid gap-3">
+                  {docList.map((d: any) => (
+                    <div
+                      key={d.id}
+                      className="flex items-center gap-3 rounded-xl border border-border p-3"
+                    >
+                      <div className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-primary">
+                        <FileText size={17} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-bold">{d.fileName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {d.fileType} · {fmt(d.uploadedAt)}
+                        </div>
+                      </div>
+                      <ChevronRight
+                        size={16}
+                        className="text-muted-foreground"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  icon={FileText}
+                  title="No documents yet"
+                  message="Upload a record from the documents area to keep the case together."
+                />
+              )}
+            </div>
+          )}
+        </Card>
+        <div className="grid content-start gap-6">
+          {workspace !== "admin" && (
+            <Card className="bg-primary p-6 text-primary-foreground">
+              <div className="flex items-center gap-2 text-accent">
+                <Sparkles size={16} />
+                <span className="jc-mono text-[10px] uppercase tracking-[.14em]">
+                  A useful next step
+                </span>
+              </div>
+              <h3 className="jc-serif mt-4 text-2xl font-bold">
+                Write down the question you are carrying.
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-primary-foreground/65">
+                Questions are easier to answer when they include a date,
+                document name, or decision.
+              </p>
+              <Link
+                href={`/${workspace}/questions`}
+                className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-accent"
+                data-testid="link-case-question"
+              >
+                Ask a lawyer <ArrowRight size={15} />
+              </Link>
+            </Card>
+          )}
+          <Card className="p-5">
+            <div className="flex items-center gap-2 font-serif text-lg font-bold">
+              <Info size={17} className="text-accent" />
+              Keep your record current
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              This is a personal organization view, not a court record. Check
+              official notices for authoritative dates.
+            </p>
+          </Card>
+        </div>
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
 
-function DocumentsPage() { const cases = useListCases(); const selectedCase: any = cases.data?.[0]; const caseId = selectedCase?.id || 0; const docs = useListDocuments(caseId, { query: { queryKey: getListDocumentsQueryKey(caseId), enabled: Boolean(caseId) } }); const create = useCreateDocument(); const t = useCopy(); const [file, setFile] = useState(''); const [saved, setSaved] = useState(false); const list: any[] = docs.data || []; const upload = () => { if (!file || !caseId) return; const extension = file.split('.').pop()?.toUpperCase() || 'FILE'; create.mutate({ data: { caseId, fileName: file, fileType: extension === 'JPG' || extension === 'JPEG' || extension === 'PNG' ? 'Image' : extension, explanation: 'A fictional sample document ready for plain-language explanation.' } as any }, { onSuccess: () => { setFile(''); setSaved(true); queryClient.invalidateQueries({ queryKey: getListDocumentsQueryKey(caseId) }); } }); }; return <><PageHead eyebrow="citizen / records" title="Documents" description="A tidy record of the papers connected to your case — with a little help making them readable." /><div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]"><Card className="p-6"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dbe9eb] text-[#255c67]"><Upload size={21} /></div><h2 className="jc-serif mt-5 text-2xl font-bold">{t('Add a document')}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{t('This prototype records the file name and type only; it does not transfer file bytes.')}</p><label className="mt-5 grid gap-2 text-sm font-bold">{t('Choose a sample PDF or image')}<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e => setFile(e.target.files?.[0]?.name || '')} className="rounded-xl border border-dashed border-primary/25 bg-secondary/35 p-4 text-sm" data-testid="input-document-file" /></label>{file && <div className="mt-3 rounded-xl bg-secondary px-3 py-2 text-sm">{file}</div>}<Button className="mt-4 w-full" onClick={upload} disabled={!file || !caseId || create.isPending} data-testid="button-upload-document"><Upload size={16} />{t(saved ? 'Saved to case' : 'Save document')}</Button>{saved && <div className="mt-3 flex items-center gap-2 text-xs font-bold text-[#3e8b73]" data-testid="status-document-saved"><Check size={14} />{t('Document record added')}</div>}{!cases.isLoading && !caseId && <div className="mt-3 text-xs text-muted-foreground">{t('A case is needed before a document can be saved.')}</div>}</Card><Card className="overflow-hidden"><div className="border-b border-border px-5 py-4"><div className="flex items-center justify-between"><div><h2 className="font-serif text-xl font-bold">{t('Case records')}</h2><p className="mt-1 text-sm text-muted-foreground">{selectedCase ? `${selectedCase.title} · ${selectedCase.caseNumber}` : t('Choose a case')}</p></div><Badge tone="blue">{list.length} {t('records')}</Badge></div></div>{cases.isLoading || docs.isLoading ? <Loading /> : list.length ? <div className="divide-y divide-border">{list.map(d => <div className="flex items-center gap-3 p-4" key={d.id}><div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><FileText size={18} /></div><div className="min-w-0 flex-1"><div className="truncate font-bold">{d.fileName}</div><div className="mt-1 text-xs text-muted-foreground">{d.fileType} · {t('uploaded')} {fmt(d.uploadedAt)}</div></div>{d.explanation && <Badge tone="good"><Sparkles size={12} />{t('Explained')}</Badge>}</div>)}</div> : <div className="p-5"><Empty title="Your record is waiting" message="Add a document name to see it here." /></div>}</Card></div><PrototypeNote /></>; }
+function DocumentsPage() {
+  const cases = useListCases();
+  const selectedCase: any = cases.data?.[0];
+  const caseId = selectedCase?.id || 0;
+  const docs = useListDocuments(caseId, {
+    query: {
+      queryKey: getListDocumentsQueryKey(caseId),
+      enabled: Boolean(caseId),
+    },
+  });
+  const create = useCreateDocument();
+  const t = useCopy();
+  const [file, setFile] = useState<File | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const list: any[] = docs.data || [];
+
+  const upload = async () => {
+    if (!file || !caseId) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`/api/cases/${caseId}/documents/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("justice-connect-token")}`,
+        },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+
+      setFile(null);
+      setSaved(true);
+      queryClient.invalidateQueries({
+        queryKey: getListDocumentsQueryKey(caseId),
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to upload document");
+    } finally {
+      setUploading(false);
+    }
+  };
+  return (
+    <>
+      <PageHead
+        eyebrow="citizen / records"
+        title="Documents"
+        description="A tidy record of the papers connected to your case — with a little help making them readable."
+      />
+      <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
+        <Card className="p-6">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dbe9eb] text-[#255c67]">
+            <Upload size={21} />
+          </div>
+          <h2 className="jc-serif mt-5 text-2xl font-bold">
+            {t("Add a document")}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {t(
+              "Upload official documents and records related to your case.",
+            )}
+          </p>
+          <label className="mt-5 grid gap-2 text-sm font-bold">
+            {t("Choose a sample PDF or image")}
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e: any) => setFile(e.target.files?.[0] || null)}
+              className="rounded-xl border border-dashed border-primary/25 bg-secondary/35 p-4 text-sm"
+              data-testid="input-document-file"
+            />
+            {file && (
+              <span className="text-xs text-muted-foreground mt-1">
+                Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+              </span>
+            )}
+          </label>
+          <Button
+            className="mt-4 w-full"
+            onClick={upload}
+            disabled={!file || !caseId || create.isPending || uploading}
+            data-testid="button-upload-document"
+          >
+            <Upload size={16} />
+            {t(uploading ? "Uploading..." : saved ? "Saved to case" : "Save document")}
+          </Button>
+          {saved && (
+            <div
+              className="mt-3 flex items-center gap-2 text-xs font-bold text-[#3e8b73]"
+              data-testid="status-document-saved"
+            >
+              <Check size={14} />
+              {t("Document record added")}
+            </div>
+          )}
+          {!cases.isLoading && !caseId && (
+            <div className="mt-3 text-xs text-muted-foreground">
+              {t("A case is needed before a document can be saved.")}
+            </div>
+          )}
+        </Card>
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-serif text-xl font-bold">
+                  {t("Case records")}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {selectedCase
+                    ? `${selectedCase.title} · ${selectedCase.caseNumber}`
+                    : t("Choose a case")}
+                </p>
+              </div>
+              <Badge tone="blue">
+                {list.length} {t("records")}
+              </Badge>
+            </div>
+          </div>
+          {cases.isLoading || docs.isLoading ? (
+            <Loading />
+          ) : list.length ? (
+            <div className="divide-y divide-border">
+              {list.map((d: any) => (
+                <div className="flex items-center justify-between gap-3 p-4" key={d.id}>
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary shrink-0">
+                      <FileText size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold break-all">{d.fileName}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {d.fileType} • {d.fileSize ? (d.fileSize / 1024 / 1024).toFixed(2) + " MB • " : ""} {new Date(d.uploadedAt).toLocaleDateString()}
+                        {d.processingStatus === "PROCESSED" && <span className="ml-2 text-green-600 font-semibold text-xs">Processed</span>}
+                      </p>
+                    </div>
+                  </div>
+                  <Link href={`/citizen/documents/${d.id}/assistant`}>
+                    <Button variant="outline" size="sm" className="whitespace-nowrap">
+                      {t("Understand")}
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-5">
+              <Empty
+                title="Your record is waiting"
+                message="Add a document name to see it here."
+              />
+            </div>
+          )}
+        </Card>
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
+
+function DocumentAssistantPage({ documentId }: { documentId?: string | number }) {
+  const [, params] = useRoute("/citizen/documents/:id/assistant");
+  const id = documentId || params?.id;
+  const t = useCopy();
+  const cases = useListCases();
+  const selectedCase: any = cases.data?.[0];
+  const caseId = selectedCase?.id || 0;
+  const docs = useListDocuments(caseId, {
+    query: {
+      queryKey: getListDocumentsQueryKey(caseId),
+      enabled: Boolean(caseId),
+    },
+  });
+  const docList: any[] = docs.data || [];
+  const doc = docList.find((d: any) => String(d.id) === String(id)) || docList[0];
+
+  const [question, setQuestion] = useState("");
+  const [qaHistory, setQaHistory] = useState<Array<{ q: string; a: string }>>([
+    {
+      q: "What is the main purpose of this document?",
+      a: "This document is an official notice/record associated with your case, detailing key dates, parties, and required actions.",
+    },
+  ]);
+  const [sessionId, setSessionId] = useState<number | undefined>(undefined);
+
+  const handleAsk = async (e: any) => {
+    e.preventDefault();
+    if (!question.trim()) return;
+    const q = question;
+    setQuestion("");
+    setQaHistory((prev) => [...prev, { q, a: "..." }]);
+    try {
+      const res = await fetch(`/api/ai/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("justice_token") || localStorage.getItem("justice-connect-token")}`,
+        },
+        body: JSON.stringify({ message: q, documentId: Number(id), sessionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Error processing request.");
+      }
+      if (data.sessionId) setSessionId(data.sessionId);
+      setQaHistory((prev) => {
+        const next = [...prev];
+        next[next.length - 1].a = data.answer || "Error processing request.";
+        return next;
+      });
+    } catch (err: any) {
+      setQaHistory((prev) => {
+        const next = [...prev];
+        next[next.length - 1].a = err.message || "Connection error. Please try again later.";
+        return next;
+      });
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-4">
+        <Link
+          href="/citizen/documents"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary"
+          data-testid="link-back-to-documents"
+        >
+          <ArrowLeft size={14} /> {t("Back to documents")}
+        </Link>
+      </div>
+
+      <PageHead
+        eyebrow="citizen / document assistant"
+        title={doc ? doc.fileName : t("Document Assistant")}
+        description={t("Analyze, simplify, and ask questions about your case document with AI guidance.")}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_.8fr]">
+        <Card className="p-6">
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <div className="flex items-center gap-3">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-primary">
+                <FileText size={22} />
+              </div>
+              <div>
+                <h2 className="font-serif text-xl font-bold text-primary">
+                  {doc ? doc.fileName : t("Selected Document")}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {doc?.fileType || "PDF / Record"} · {doc?.uploadedAt ? fmt(doc.uploadedAt) : t("Recent")}
+                </p>
+              </div>
+            </div>
+            <Badge tone="good">
+              <Sparkles size={12} /> {t("AI Explained")}
+            </Badge>
+          </div>
+
+          <div className="mt-6 space-y-6">
+            <div>
+              <h3 className="font-serif text-lg font-bold text-primary">
+                {t("Plain-Language Summary")}
+              </h3>
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                {t(
+                  "This document outlines formal proceedings and key deadlines. It serves as a personal reference record to help you stay organized and prepared for upcoming steps in your case.",
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-secondary/50 p-5">
+              <h4 className="font-serif font-bold text-primary mb-3">{t("Key Takeaways")}</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <Check size={16} className="text-[#3e8b73] mt-0.5 shrink-0" />
+                  <span>{t("Review all listed dates and venue details carefully.")}</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check size={16} className="text-[#3e8b73] mt-0.5 shrink-0" />
+                  <span>{t("Keep original notices secure and accessible.")}</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check size={16} className="text-[#3e8b73] mt-0.5 shrink-0" />
+                  <span>{t("Consult a qualified professional for legal advice regarding your specific situation.")}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 flex flex-col h-[600px]">
+          <div className="flex items-center gap-2 border-b border-border pb-4 font-serif text-lg font-bold text-primary">
+            <Sparkles size={18} className="text-accent" />
+            {t("Ask about this document")}
+          </div>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+            {qaHistory.map((item, idx) => (
+              <div key={idx} className="space-y-2">
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground">
+                    {item.q}
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-2xl bg-secondary px-4 py-3 text-sm leading-6 text-primary">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#3e8b73]">
+                      {t("Assistant")}
+                    </div>
+                    {item.a}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleAsk} className="mt-auto pt-4 border-t border-border flex gap-2">
+            <input
+              type="text"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder={t("Ask a question about this document...")}
+              className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-accent"
+              data-testid="input-document-question"
+            />
+            <Button type="submit" className="h-11 px-4" data-testid="button-send-document-question">
+              <Send size={16} />
+            </Button>
+          </form>
+        </Card>
+      </div>
+
+      <PrototypeNote />
+    </>
+  );
+}
 
 function ExplainerPage() {
   const [step, setStep] = useState(0);
   const t = useCopy();
   const steps = [
-    { label: 'What it says', text: 'This notice asks you to attend a hearing about a property boundary review on 12 September 2024 at 10:30 AM.' },
-    { label: 'What it means', text: 'The court wants to hear from the people involved before deciding what happens next. It is not a final decision.' },
-    { label: 'What you can do', text: 'Keep the notice, note the date, and write down what you want the court to know. You may wish to ask a qualified lawyer about your situation.' },
+    {
+      label: "What it says",
+      text: "This notice asks you to attend a hearing about a property boundary review on 12 September 2024 at 10:30 AM.",
+    },
+    {
+      label: "What it means",
+      text: "The court wants to hear from the people involved before deciding what happens next. It is not a final decision.",
+    },
+    {
+      label: "What you can do",
+      text: "Keep the notice, note the date, and write down what you want the court to know. You may wish to ask a qualified lawyer about your situation.",
+    },
   ];
-  return <><PageHead eyebrow="citizen / document explainer" title="A document, made clearer." description="A predefined fictional example showing how a formal notice can be read in layers." /><div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]"><Card className="overflow-hidden"><div className="border-b border-border bg-secondary/30 px-6 py-5"><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">{t('Sample document · not an official notice')}</div><h2 className="jc-serif mt-3 text-2xl font-bold">{t('Notice of hearing')}</h2><div className="mt-4 grid gap-2 text-sm text-muted-foreground"><div className="flex justify-between border-b border-border py-2"><span>{t('Case')}</span><b className="text-foreground">JC-2024-0187</b></div><div className="flex justify-between border-b border-border py-2"><span>{t('Date')}</span><b className="text-foreground">12 September 2024</b></div><div className="flex justify-between py-2"><span>{t('Venue')}</span><b className="text-foreground">District Court, Madurai</b></div></div></div><div className="space-y-4 p-6 text-sm leading-7 text-muted-foreground"><p>{t('To the concerned parties,')}</p><p>{t('Take notice that the above matter is listed for hearing before the District Court on the date and time mentioned above. Parties may be present and submit relevant records.')}</p><p className="font-serif italic text-foreground">{t('This sample is for learning the shape of a notice. Always read the original and seek qualified advice for your circumstances.')}</p></div></Card><Card className="p-6"><div className="flex items-center justify-between"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">{t('Plain-language layers')}</div><h2 className="jc-serif mt-2 text-2xl font-bold">{t(steps[step].label)}</h2></div><div className="jc-mono text-sm text-muted-foreground">0{step + 1} / 03</div></div><div className="mt-6 rounded-2xl bg-[#e7f1eb] p-5 text-lg leading-8 text-primary">{t(steps[step].text)}</div><div className="mt-6 grid gap-2">{steps.map((s, i) => <button key={s.label} onClick={() => setStep(i)} className={cx('flex items-center gap-3 rounded-xl border p-3 text-left text-sm font-bold', i === step ? 'border-accent bg-accent/15' : 'border-border')} data-testid={`button-explainer-step-${i}`}><span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-xs">{i < step ? <Check size={14} /> : i + 1}</span>{t(s.label)}<ChevronRight size={15} className="ml-auto text-muted-foreground" /></button>)}</div><div className="mt-7 flex justify-between"><Button variant="outline" onClick={() => setStep(Math.max(0, step - 1))} disabled={!step} data-testid="button-explainer-prev">{t('Previous')}</Button><Button onClick={() => setStep(Math.min(2, step + 1))} disabled={step === 2} data-testid="button-explainer-next">{t('Next layer')} <ArrowRight size={15} /></Button></div></Card></div><div className="mt-6 grid gap-4 md:grid-cols-3"><Card className="p-5"><h3 className="font-serif font-bold">{t('Important dates')}</h3><ul className="mt-3 grid gap-2 text-sm text-muted-foreground"><li>{t('Filing date')} · 14 February 2024</li><li>{t('Hearing date')} · 12 September 2024</li><li>{t('Response date')} · 20 September 2024</li></ul></Card><Card className="p-5"><h3 className="font-serif font-bold">{t('Simple legal terms')}</h3><div className="mt-3 grid gap-3 text-sm leading-6 text-muted-foreground">{simpleTerms.map(item => <div key={item.term}><b className="text-foreground">{t(item.term)}</b><div>{t(item.meaning)}</div></div>)}</div></Card><Card className="p-5"><h3 className="font-serif font-bold">{t('Key points')}</h3><ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground"><li>{t('Keep the original notice.')}</li><li>{t('Note the date and venue.')}</li><li>{t('Gather relevant records.')}</li><li>{t('Ask a qualified professional if unsure.')}</li></ul></Card></div><div className="mt-5 rounded-xl border border-[#d4a64e]/40 bg-[#f7e7c2] p-4 text-sm text-[#795a17]"><AlertTriangle size={16} className="mr-2 inline align-[-3px]" />{t('This explanation is for demonstration purposes only and is not legal advice.')}</div><PrototypeNote /></>;
+  return (
+    <>
+      <PageHead
+        eyebrow="citizen / document explainer"
+        title="A document, made clearer."
+        description="A predefined fictional example showing how a formal notice can be read in layers."
+      />
+      <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
+        <Card className="overflow-hidden">
+          <div className="border-b border-border bg-secondary/30 px-6 py-5">
+            <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">
+              {t("Sample document · not an official notice")}
+            </div>
+            <h2 className="jc-serif mt-3 text-2xl font-bold">
+              {t("Notice of hearing")}
+            </h2>
+            <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+              <div className="flex justify-between border-b border-border py-2">
+                <span>{t("Case")}</span>
+                <b className="text-foreground">JC-2024-0187</b>
+              </div>
+              <div className="flex justify-between border-b border-border py-2">
+                <span>{t("Date")}</span>
+                <b className="text-foreground">12 September 2024</b>
+              </div>
+              <div className="flex justify-between py-2">
+                <span>{t("Venue")}</span>
+                <b className="text-foreground">District Court, Madurai</b>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4 p-6 text-sm leading-7 text-muted-foreground">
+            <p>{t("To the concerned parties,")}</p>
+            <p>
+              {t(
+                "Take notice that the above matter is listed for hearing before the District Court on the date and time mentioned above. Parties may be present and submit relevant records.",
+              )}
+            </p>
+            <p className="font-serif italic text-foreground">
+              {t(
+                "This sample is for learning the shape of a notice. Always read the original and seek qualified advice for your circumstances.",
+              )}
+            </p>
+          </div>
+        </Card>
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">
+                {t("Plain-language layers")}
+              </div>
+              <h2 className="jc-serif mt-2 text-2xl font-bold">
+                {t(steps[step].label)}
+              </h2>
+            </div>
+            <div className="jc-mono text-sm text-muted-foreground">
+              0{step + 1} / 03
+            </div>
+          </div>
+          <div className="mt-6 rounded-2xl bg-[#e7f1eb] p-5 text-lg leading-8 text-primary">
+            {t(steps[step].text)}
+          </div>
+          <div className="mt-6 grid gap-2">
+            {steps.map((s, i) => (
+              <button
+                key={s.label}
+                onClick={() => setStep(i)}
+                className={cx(
+                  "flex items-center gap-3 rounded-xl border p-3 text-left text-sm font-bold",
+                  i === step ? "border-accent bg-accent/15" : "border-border",
+                )}
+                data-testid={`button-explainer-step-${i}`}
+              >
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-xs">
+                  {i < step ? <Check size={14} /> : i + 1}
+                </span>
+                {t(s.label)}
+                <ChevronRight
+                  size={15}
+                  className="ml-auto text-muted-foreground"
+                />
+              </button>
+            ))}
+          </div>
+          <div className="mt-7 flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setStep(Math.max(0, step - 1))}
+              disabled={!step}
+              data-testid="button-explainer-prev"
+            >
+              {t("Previous")}
+            </Button>
+            <Button
+              onClick={() => setStep(Math.min(2, step + 1))}
+              disabled={step === 2}
+              data-testid="button-explainer-next"
+            >
+              {t("Next layer")} <ArrowRight size={15} />
+            </Button>
+          </div>
+        </Card>
+      </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <Card className="p-5">
+          <h3 className="font-serif font-bold">{t("Important dates")}</h3>
+          <ul className="mt-3 grid gap-2 text-sm text-muted-foreground">
+            <li>{t("Filing date")} · 14 February 2024</li>
+            <li>{t("Hearing date")} · 12 September 2024</li>
+            <li>{t("Response date")} · 20 September 2024</li>
+          </ul>
+        </Card>
+        <Card className="p-5">
+          <h3 className="font-serif font-bold">{t("Simple legal terms")}</h3>
+          <div className="mt-3 grid gap-3 text-sm leading-6 text-muted-foreground">
+            {simpleTerms.map((item) => (
+              <div key={item.term}>
+                <b className="text-foreground">{t(item.term)}</b>
+                <div>{t(item.meaning)}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card className="p-5">
+          <h3 className="font-serif font-bold">{t("Key points")}</h3>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
+            <li>{t("Keep the original notice.")}</li>
+            <li>{t("Note the date and venue.")}</li>
+            <li>{t("Gather relevant records.")}</li>
+            <li>{t("Ask a qualified professional if unsure.")}</li>
+          </ul>
+        </Card>
+      </div>
+      <div className="mt-5 rounded-xl border border-[#d4a64e]/40 bg-[#f7e7c2] p-4 text-sm text-[#795a17]">
+        <AlertTriangle size={16} className="mr-2 inline align-[-3px]" />
+        {t(
+          "This explanation is for demonstration purposes only and is not legal advice.",
+        )}
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
+
+function SettingsPage() {
+  const t = useCopy();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [status, setStatus] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatus("");
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("justice_token") || localStorage.getItem("justice-connect-token")}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to change password");
+      setStatus("success:Password changed successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch (err: any) {
+      setStatus("error:" + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-xl">
+      <PageHead eyebrow="account / settings" title={t("Settings")} description={t("Manage your preferences and security.")} />
+      <Card className="p-6 mt-6">
+        <h3 className="font-serif text-xl font-bold mb-4">{t("Change Password")}</h3>
+        <form onSubmit={changePassword} className="grid gap-4">
+          <Field
+            label={t("Current Password")}
+            type="password"
+            value={currentPassword}
+            onChange={(e: any) => setCurrentPassword(e.target.value)}
+            required
+          />
+          <Field
+            label={t("New Password")}
+            type="password"
+            value={newPassword}
+            onChange={(e: any) => setNewPassword(e.target.value)}
+            required
+            minLength={8}
+          />
+          {status.startsWith("error:") && (
+            <div className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]">{status.replace("error:", "")}</div>
+          )}
+          {status.startsWith("success:") && (
+            <div className="rounded-xl bg-[#e7f1eb] px-4 py-3 text-sm text-[#3e8b73]">{status.replace("success:", "")}</div>
+          )}
+          <Button type="submit" disabled={isLoading} className="mt-2 h-10 w-auto justify-center">
+            {isLoading ? t("Updating...") : t("Update Password")}
+          </Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+function GeneralAssistantPage() {
+  const t = useCopy();
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; disclaimer?: string; file?: { name: string, type: string } }[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<number | undefined>(undefined);
+  const [inlineData, setInlineData] = useState<{ data: string; mimeType: string; name: string } | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = 'en-IN'; // Indian English/Regional
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => prev ? prev + " " + transcript : transcript);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } else {
+        alert("Voice recognition not supported in this browser.");
+      }
+    }
+  };
+
+  const toggleSpeech = (text: string, idx: number) => {
+    if ('speechSynthesis' in window) {
+      if (speakingIdx === idx) {
+        window.speechSynthesis.cancel();
+        setSpeakingIdx(null);
+      } else {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-IN';
+        utterance.onend = () => setSpeakingIdx(null);
+        setSpeakingIdx(idx);
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      setInlineData({ mimeType: file.type, data: base64, name: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSubmit = async (e?: React.FormEvent, predefinedMessage?: string) => {
+    if (e) e.preventDefault();
+    const messageToSend = predefinedMessage || input;
+    if ((!messageToSend.trim() && !inlineData) || isLoading) return;
+
+    setInput("");
+    const sentInlineData = inlineData;
+    setInlineData(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    setMessages(prev => [...prev, { role: "user", content: messageToSend, file: sentInlineData ? { name: sentInlineData.name, type: sentInlineData.mimeType } : undefined }]);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(`/api/ai/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("justice_token") || localStorage.getItem("justice-connect-token")}`,
+        },
+        body: JSON.stringify({ message: messageToSend || "Uploaded a file.", sessionId, inlineData: sentInlineData }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to get response");
+      }
+
+      if (data.sessionId) setSessionId(data.sessionId);
+
+      setMessages(prev => [
+        ...prev,
+        { role: "assistant", content: data.answer, disclaimer: data.disclaimer },
+      ]);
+    } catch (error: any) {
+      console.error(error);
+      setMessages(prev => [
+        ...prev,
+        { role: "assistant", content: error.message || "Sorry, I encountered an error while processing your request." },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 flex flex-col h-[calc(100vh-100px)]">
+      <PageHead
+        eyebrow={`${window.location.pathname.includes("/lawyer") ? "lawyer" : "citizen"} / general assistant`}
+        title={t("Justice Connect Assistant")}
+        description={t("Ask general questions about your legal rights and procedures.")}
+      />
+
+      <div className="flex-1 overflow-hidden flex flex-col bg-card rounded-lg border shadow-sm">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-center text-muted-foreground p-8">
+              <div className="max-w-md">
+                <Sparkles className="h-12 w-12 mx-auto mb-4 text-accent/50" />
+                <h3 className="text-lg font-medium text-foreground mb-2">How can I help you today?</h3>
+                <p className="text-sm mb-4">I can provide general educational information about legal rights, procedures, and options available to you.</p>
+                <div className="grid grid-cols-2 gap-2 text-left">
+                  <Button variant="outline" size="sm" onClick={() => handleSubmit(undefined, "Check My Case")} className="justify-start text-xs font-normal">Check My Case</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleSubmit(undefined, "Find a Lawyer")} className="justify-start text-xs font-normal">Find a Lawyer</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleSubmit(undefined, "Legal Rights")} className="justify-start text-xs font-normal">Legal Rights</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleSubmit(undefined, "Legal Terms")} className="justify-start text-xs font-normal">Legal Terms</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleSubmit(undefined, "Legal Aid")} className="justify-start text-xs font-normal">Legal Aid</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                }`}>
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</div>
+                  {msg.file && (
+                    <div className="mt-2 text-xs opacity-80 border-t border-primary-foreground/30 pt-2 flex items-center gap-1">
+                      📄 {msg.file.name}
+                    </div>
+                  )}
+                  {msg.disclaimer && (
+                    <div className="mt-3 text-[10px] text-muted-foreground pt-2 border-t border-border/50">
+                      {msg.disclaimer}
+                    </div>
+                  )}
+                  {msg.role === "assistant" && (
+                    <button onClick={() => toggleSpeech(msg.content, idx)} className="mt-2 flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors">
+                      {speakingIdx === idx ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                      {speakingIdx === idx ? t("Stop") : t("Listen")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-muted text-foreground max-w-[80%] rounded-2xl px-4 py-3 flex items-center gap-2">
+                <div className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce delay-100" />
+                <div className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce delay-200" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 bg-muted/30 border-t">
+          {inlineData && (
+            <div className="mb-2 text-xs text-primary flex items-center gap-2">
+              <span className="font-semibold bg-primary/10 px-2 py-1 rounded">Attached: {inlineData.name}</span>
+              <button type="button" onClick={() => { setInlineData(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="text-red-500 font-bold hover:underline">Remove</button>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+            <input
+              type="file"
+              accept="image/*,audio/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach Image or Audio"
+            >
+              <Plus size={16} />
+            </Button>
+            <Button
+              type="button"
+              variant={isListening ? "default" : "outline"}
+              size="icon"
+              className={`rounded-full shrink-0 ${isListening ? "bg-red-500 hover:bg-red-600 text-white" : ""}`}
+              onClick={toggleListening}
+              title="Voice Input (Regional)"
+            >
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </Button>
+            <div className="flex-1 relative flex items-center">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={isListening ? "Listening..." : "Ask a general legal question..."}
+                className="w-full bg-background rounded-full px-4 py-2 text-sm border focus:outline-none focus:ring-2 focus:ring-primary/50 pr-12"
+                disabled={isLoading}
+              />
+              {isListening && (
+                <div className="absolute right-3 flex items-center gap-1">
+                  <div className="w-1 h-2 bg-red-500 rounded-full animate-[bounce_1s_infinite_0ms]"></div>
+                  <div className="w-1 h-3 bg-red-500 rounded-full animate-[bounce_1s_infinite_200ms]"></div>
+                  <div className="w-1 h-4 bg-red-500 rounded-full animate-[bounce_1s_infinite_100ms]"></div>
+                  <div className="w-1 h-2 bg-red-500 rounded-full animate-[bounce_1s_infinite_300ms]"></div>
+                </div>
+              )}
+            </div>
+            <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={(!input.trim() && !inlineData) || isLoading}>
+              <Send size={16} />
+            </Button>
+          </form>
+          <div className="text-center mt-2 text-[10px] text-muted-foreground">
+            {t("This prototype only provides general educational information.")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function LawyersPage() {
-  const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ location: '', language: '', specialization: '', availability: '', experience: '' });
+  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({
+    location: "",
+    language: "",
+    specialization: "",
+    availability: "",
+    experience: "",
+  });
   const t = useCopy();
-  const query: any = { location: filters.location || undefined, language: filters.language || undefined, specialization: filters.specialization || undefined, availability: filters.availability || undefined };
+  const query: any = {
+    location: filters.location || undefined,
+    language: filters.language || undefined,
+    specialization: filters.specialization || undefined,
+    availability: filters.availability || undefined,
+  };
   const lawyers = useListLawyers(query);
   const list: any[] = lawyers.data || [];
-  const filtered = list.filter(l => `${l.name} ${l.specialization} ${l.location} ${l.languages?.join(' ')} ${l.availability}`.toLowerCase().includes(search.toLowerCase()) && (!filters.experience || l.experience >= Number(filters.experience)));
-  const setFilter = (key: string, value: string) => setFilters({ ...filters, [key]: value });
-  return <><PageHead eyebrow="citizen / directory" title="Find a lawyer" description="Fictional sample lawyers, shown to help you imagine the right kind of conversation." /><div className="mb-5 flex items-start gap-3 rounded-2xl border border-[#3e8b73]/25 bg-[#e7f1eb] p-4 text-sm leading-6 text-primary"><ShieldCheck size={18} className="mt-1 shrink-0 text-[#3e8b73]" /><div><b>{t('Look for the green verification tick')}</b><p className="text-primary/70">{t('A tick means an administrator matched the fictional council number in this prototype. It is not proof of a real licence.')}</p></div></div><Card className="p-4"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><div className="relative xl:col-span-2"><Search size={17} className="absolute left-3 top-3 text-muted-foreground" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('Search by name, place, or practice area')} className="h-11 w-full rounded-xl border border-input bg-background pl-10 outline-none focus:border-accent" data-testid="input-search-lawyers" /></div><input value={filters.location} onChange={e => setFilter('location', e.target.value)} placeholder={t('Location')} className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-accent" data-testid="input-lawyer-location-filter" /><select value={filters.language} onChange={e => setFilter('language', e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none" data-testid="select-lawyer-language"><option value="">{t('All languages')}</option><option>Tamil</option><option>English</option><option>Malayalam</option></select><select value={filters.specialization} onChange={e => setFilter('specialization', e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none" data-testid="select-lawyer-specialization"><option value="">{t('All practice areas')}</option><option value="Civil">Civil</option><option value="Family">Family</option><option value="Consumer">Consumer</option><option value="Property">Property</option><option value="Employment">Employment</option></select><select value={filters.experience} onChange={e => setFilter('experience', e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none" data-testid="select-lawyer-experience"><option value="">{t('Any experience')}</option><option value="5">{t('5+ years')}</option><option value="8">{t('8+ years')}</option><option value="10">{t('10+ years')}</option></select><select value={filters.availability} onChange={e => setFilter('availability', e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none" data-testid="select-lawyer-availability"><option value="">{t('Any availability')}</option><option>Available</option><option>Limited</option></select></div></Card><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{lawyers.isLoading ? <Loading rows={3} /> : filtered.length ? filtered.map(l => <LawyerCard lawyer={l} key={l.id} />) : <div className="md:col-span-2 xl:col-span-3"><Empty icon={Scale} title="No lawyers match those filters" message="Try a broader location, language, or practice area." /></div>}</div><PrototypeNote /></>;
+  const filtered = list.filter(
+    (l) =>
+      `${l.name} ${l.specialization} ${l.location} ${l.languages?.join(" ")} ${l.availability}`
+        .toLowerCase()
+        .includes(search.toLowerCase()) &&
+      (!filters.experience || l.experience >= Number(filters.experience)),
+  );
+  const setFilter = (key: string, value: string) =>
+    setFilters({ ...filters, [key]: value });
+  return (
+    <>
+      <PageHead
+        eyebrow="citizen / directory"
+        title="Find a lawyer"
+        description="Fictional sample lawyers, shown to help you imagine the right kind of conversation."
+      />
+      <div className="mb-5 flex items-start gap-3 rounded-2xl border border-[#3e8b73]/25 bg-[#e7f1eb] p-4 text-sm leading-6 text-primary">
+        <ShieldCheck size={18} className="mt-1 shrink-0 text-[#3e8b73]" />
+        <div>
+          <b>{t("Look for the green verification tick")}</b>
+          <p className="text-primary/70">
+            {t(
+              "A tick means an administrator matched the fictional council number in this prototype. It is not proof of a real licence.",
+            )}
+          </p>
+        </div>
+      </div>
+      <Card className="p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="relative xl:col-span-2">
+            <Search
+              size={17}
+              className="absolute left-3 top-3 text-muted-foreground"
+            />
+            <input
+              value={search}
+              onChange={(e: any) => setSearch(e.target.value)}
+              placeholder={t("Search by name, place, or practice area")}
+              className="h-11 w-full rounded-xl border border-input bg-background pl-10 outline-none focus:border-accent"
+              data-testid="input-search-lawyers"
+            />
+          </div>
+          <input
+            value={filters.location}
+            onChange={(e: any) => setFilter("location", e.target.value)}
+            placeholder={t("Location")}
+            className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-accent"
+            data-testid="input-lawyer-location-filter"
+          />
+          <select
+            value={filters.language}
+            onChange={(e: any) => setFilter("language", e.target.value)}
+            className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none"
+            data-testid="select-lawyer-language"
+          >
+            <option value="">{t("All languages")}</option>
+            <option>Tamil</option>
+            <option>English</option>
+            <option>Malayalam</option>
+          </select>
+          <select
+            value={filters.specialization}
+            onChange={(e: any) => setFilter("specialization", e.target.value)}
+            className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none"
+            data-testid="select-lawyer-specialization"
+          >
+            <option value="">{t("All practice areas")}</option>
+            <option value="Civil">Civil</option>
+            <option value="Family">Family</option>
+            <option value="Consumer">Consumer</option>
+            <option value="Property">Property</option>
+            <option value="Employment">Employment</option>
+          </select>
+          <select
+            value={filters.experience}
+            onChange={(e: any) => setFilter("experience", e.target.value)}
+            className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none"
+            data-testid="select-lawyer-experience"
+          >
+            <option value="">{t("Any experience")}</option>
+            <option value="5">{t("5+ years")}</option>
+            <option value="8">{t("8+ years")}</option>
+            <option value="10">{t("10+ years")}</option>
+          </select>
+          <select
+            value={filters.availability}
+            onChange={(e: any) => setFilter("availability", e.target.value)}
+            className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none"
+            data-testid="select-lawyer-availability"
+          >
+            <option value="">{t("Any availability")}</option>
+            <option>Available</option>
+            <option>Limited</option>
+          </select>
+        </div>
+      </Card>
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {lawyers.isLoading ? (
+          <Loading rows={3} />
+        ) : filtered.length ? (
+          filtered.map((l: any) => <LawyerCard lawyer={l} key={l.id} />)
+        ) : (
+          <div className="md:col-span-2 xl:col-span-3">
+            <Empty
+              icon={Scale}
+              title="No lawyers match those filters"
+              message="Try a broader location, language, or practice area."
+            />
+          </div>
+        )}
+      </div>
+      <PrototypeNote />
+    </>
+  );
 }
-function LawyerCard({ lawyer: l }: { lawyer: any }) { const [, setLocation] = useLocation(); const t = useCopy(); const verified = l.verificationStatus === 'Verified Sample Lawyer'; return <Card className="p-5 transition hover:-translate-y-1"><div className="flex items-start justify-between gap-3"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary font-serif text-lg font-bold text-primary-foreground">{l.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}</div><Badge tone={verified ? 'good' : l.verificationStatus === 'Suspended' || l.verificationStatus === 'Rejected' ? 'alert' : 'warn'}>{verified ? <ShieldCheck size={12} /> : null}{t(l.verificationStatus)}</Badge></div><h3 className="mt-5 flex items-center gap-2 font-serif text-xl font-bold text-primary">{l.name}{verified && <span className="grid h-5 w-5 place-items-center rounded-full bg-[#3e8b73] text-white" title={t('Verified Sample Lawyer')}><Check size={13} strokeWidth={3} /></span>}</h3><p className="mt-1 text-sm text-[#3e8b73]">{l.specialization} law</p><div className="mt-4 grid gap-2 text-sm text-muted-foreground"><div className="flex gap-2"><Building2 size={15} />{l.location}</div><div className="flex gap-2"><BookOpen size={15} />{l.languages?.join(' · ')}</div><div className="flex gap-2"><BriefcaseBusiness size={15} />{l.experience} {t('years experience')}</div>{l.sampleRegistrationNumber && <div className="flex gap-2"><ShieldCheck size={15} />{t('Council / registration number')}: {l.sampleRegistrationNumber}</div>}</div><div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-xs font-bold text-[#3e8b73]">{t(l.availability)}</span><Button variant="outline" className="min-h-9 px-3 text-xs" onClick={() => setLocation('/citizen/questions')} data-testid={`button-ask-lawyer-${l.id}`}>{t('Ask a question')} <ArrowRight size={14} /></Button></div>{verified && <p className="mt-3 text-[11px] leading-5 text-muted-foreground">{t('Verified only against fictional prototype records; this is not a real licence check.')}</p>}</Card>; }
+function LawyerCard({ lawyer: l }: { lawyer: any }) {
+  const [, setLocation] = useLocation();
+  const t = useCopy();
+  const verified = l.verificationStatus === "Verified Sample Lawyer";
+  return (
+    <Card className="p-5 transition hover:-translate-y-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary font-serif text-lg font-bold text-primary-foreground">
+          {l.name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .slice(0, 2)}
+        </div>
+        <Badge
+          tone={
+            verified
+              ? "good"
+              : l.verificationStatus === "Suspended" ||
+                  l.verificationStatus === "Rejected"
+                ? "alert"
+                : "warn"
+          }
+        >
+          {verified ? <ShieldCheck size={12} /> : null}
+          {t(l.verificationStatus)}
+        </Badge>
+      </div>
+      <h3 className="mt-5 flex items-center gap-2 font-serif text-xl font-bold text-primary">
+        {l.name}
+        {verified && (
+          <span
+            className="grid h-5 w-5 place-items-center rounded-full bg-[#3e8b73] text-white"
+            title={t("Verified Sample Lawyer")}
+          >
+            <Check size={13} strokeWidth={3} />
+          </span>
+        )}
+      </h3>
+      <p className="mt-1 text-sm text-[#3e8b73]">{l.specialization} law</p>
+      <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+        <div className="flex gap-2">
+          <Building2 size={15} />
+          {l.location}
+        </div>
+        <div className="flex gap-2">
+          <BookOpen size={15} />
+          {l.languages?.join(" · ")}
+        </div>
+        <div className="flex gap-2">
+          <BriefcaseBusiness size={15} />
+          {l.experience} {t("years experience")}
+        </div>
+        {l.sampleRegistrationNumber && (
+          <div className="flex gap-2">
+            <ShieldCheck size={15} />
+            {t("Council / registration number")}: {l.sampleRegistrationNumber}
+          </div>
+        )}
+      </div>
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+        <span className="text-xs font-bold text-[#3e8b73]">
+          {t(l.availability)}
+        </span>
+        <Button
+          className="min-h-9 px-4 text-xs bg-primary"
+          onClick={() => setLocation(`/citizen/lawyers/${l.id}`)}
+          data-testid={`button-request-appointment-${l.id}`}
+        >
+          <CalendarPlus size={15} className="mr-2" />
+          {t("View Profile & Request")}
+        </Button>
+      </div>
+      {verified && (
+        <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+          {t(
+            "Verified only against fictional prototype records; this is not a real licence check.",
+          )}
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function LawyerDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const t = useCopy();
+  const lawyerQuery = useGetLawyer(Number(id), { query: { queryKey: getGetLawyerQueryKey(Number(id)), enabled: !!id } });
+  const lawyer = lawyerQuery.data;
+
+  const [apptForm, setApptForm] = useState({ caseId: "", caseType: "", subject: "", description: "" });
+  const [apptSuccess, setApptSuccess] = useState(false);
+  const createAppt = useCreateAppointment();
+  const myCases = useListCases();
+
+  if (lawyerQuery.isLoading) {
+    return (
+      <>
+        <PageHead eyebrow="citizen / lawyer" title="Loading profile." />
+        <Loading rows={4} />
+      </>
+    );
+  }
+
+  if (!lawyer) {
+    return (
+      <Empty
+        icon={UserSearch}
+        title="Lawyer not found"
+        message="This lawyer profile does not exist or has been removed."
+      />
+    );
+  }
+
+  const verified = lawyer.verificationStatus === "Verified Sample Lawyer";
+
+  return (
+    <>
+      <Link
+        href={`/citizen/lawyers`}
+        className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft size={15} />
+        Back to directory
+      </Link>
+      <PageHead
+        eyebrow="citizen / lawyer profile"
+        title={lawyer.name}
+        description={`${lawyer.specialization} law · ${lawyer.location}`}
+        action={
+          <Badge
+            tone={
+              verified
+                ? "good"
+                : lawyer.verificationStatus === "Suspended" ||
+                    lawyer.verificationStatus === "Rejected"
+                  ? "alert"
+                  : "warn"
+            }
+          >
+            {verified && <ShieldCheck size={12} />}
+            {t(lawyer.verificationStatus)}
+          </Badge>
+        }
+      />
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
+        <Card className="p-6 h-fit">
+          <div className="flex items-center gap-5 border-b border-border pb-6">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary font-serif text-2xl font-bold text-primary-foreground">
+              {lawyer.name
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .slice(0, 2)}
+            </div>
+            <div>
+              <h2 className="font-serif text-2xl font-bold text-primary flex items-center gap-2">
+                {lawyer.name}
+                {verified && (
+                  <span
+                    className="grid h-5 w-5 place-items-center rounded-full bg-[#3e8b73] text-white"
+                    title={t("Verified Sample Lawyer")}
+                  >
+                    <Check size={13} strokeWidth={3} />
+                  </span>
+                )}
+              </h2>
+              <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-4 text-sm">
+                <span className="flex items-center gap-1.5"><Building2 size={14} /> {lawyer.location}</span>
+                <span className="flex items-center gap-1.5"><BriefcaseBusiness size={14} /> {lawyer.experience} {t("years experience")}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="py-6 border-b border-border">
+            <h3 className="font-serif text-xl font-bold mb-4">Professional Details</h3>
+            <div className="grid gap-4 sm:grid-cols-2 text-sm">
+              <div><span className="text-muted-foreground text-xs block mb-1">Specialization</span><strong className="text-foreground">{lawyer.specialization} law</strong></div>
+              <div><span className="text-muted-foreground text-xs block mb-1">Languages</span><strong className="text-foreground">{lawyer.languages?.join(" · ") || "English"}</strong></div>
+              <div><span className="text-muted-foreground text-xs block mb-1">Current Availability</span><strong className="text-[#3e8b73]">{t(lawyer.availability)}</strong></div>
+              <div><span className="text-muted-foreground text-xs block mb-1">Council Reg No.</span><strong className="text-foreground">{lawyer.sampleRegistrationNumber || "Not provided"}</strong></div>
+            </div>
+          </div>
+
+          <div className="pt-6">
+            <h3 className="font-serif text-xl font-bold mb-3">About</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This is a prototype view. In a real system, this page would contain detailed reviews, success rate statistics, a complete biography, and published legal articles by {lawyer.name}.
+            </p>
+          </div>
+        </Card>
+
+        <Card className="p-6 h-fit bg-[#f8fcfb] border-accent/20">
+          <div className="mb-6 border-b border-border pb-4">
+            <h2 className="font-serif text-xl font-bold text-primary flex items-center gap-2">
+              <CalendarPlus size={20} className="text-accent" />
+              Request Appointment / Submit Complaint
+            </h2>
+            <p className="text-muted-foreground text-sm mt-2">
+              Send a formal request directly to {lawyer.name}'s dashboard for review.
+            </p>
+          </div>
+
+          {apptSuccess ? (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center text-green-800">
+              <CheckCircle2 size={32} className="mx-auto mb-3 text-green-600" />
+              <div className="font-bold text-lg mb-1">Request sent!</div>
+              <p className="text-sm">
+                {lawyer.name} has received your request. You will be notified if they accept the appointment to open a case.
+              </p>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                createAppt.mutate(
+                  { data: { lawyerId: Number(lawyer.id), caseId: apptForm.caseId ? Number(apptForm.caseId) : undefined, caseType: apptForm.caseType, subject: apptForm.subject, description: apptForm.description } as any },
+                  { onSuccess: () => setApptSuccess(true) }
+                );
+              }}
+              className="grid gap-4"
+            >
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Share Existing Case (Optional)
+                <select
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none focus:border-primary"
+                  value={apptForm.caseId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const selected = myCases.data?.find((c: any) => c.id.toString() === id);
+                    if (selected) {
+                      setApptForm({ ...apptForm, caseId: id, caseType: selected.category, subject: selected.title });
+                    } else {
+                      setApptForm({ ...apptForm, caseId: id });
+                    }
+                  }}
+                >
+                  <option value="">-- New Request / No Case --</option>
+                  {myCases.data?.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.caseNumber} - {c.title}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Case Type
+                <select
+                  required
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none focus:border-primary"
+                  value={apptForm.caseType}
+                  onChange={(e) => setApptForm({ ...apptForm, caseType: e.target.value })}
+                >
+                  <option value="">Select a category</option>
+                  {["Civil", "Criminal", "Family", "Consumer", "Property", "Employment", "General"].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+
+              <Field
+                label="Subject / Short Title"
+                required
+                value={apptForm.subject}
+                onChange={(e: any) => setApptForm({ ...apptForm, subject: e.target.value })}
+                placeholder="e.g. Property Dispute in North District"
+              />
+
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Complaint Description
+                <textarea
+                  required
+                  className="min-h-[120px] rounded-xl border border-input bg-background p-3 font-normal outline-none focus:border-primary"
+                  value={apptForm.description}
+                  onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })}
+                  placeholder="Describe your issue in detail..."
+                />
+              </label>
+
+              <Button
+                type="submit"
+                className="mt-2 h-12 w-full bg-primary hover:bg-primary/90"
+                disabled={createAppt.isPending}
+              >
+                {createAppt.isPending ? "Submitting..." : "Submit to Lawyer"}
+              </Button>
+            </form>
+          )}
+        </Card>
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
+
+
 
 // @ts-ignore - the compact prototype form uses untyped event handlers
-function LegacyQuestionsPage({ lawyer = false }: { lawyer?: boolean }) { const listQuery = useListQuestions(); const lawyerQuery = useListLawyers(); const create = useCreateQuestion(); const respond = useRespondToQuestion(); const [selected, setSelected] = useState<any>(null); const [response, setResponse] = useState(''); const [attachment, setAttachment] = useState(''); const [form, setForm] = useState({ category: 'Civil', question: '', lawyerId: '1' }); const list: any[] = listQuery.data || []; const lawyerList: any[] = lawyerQuery.data || []; const submit = (e: any) => { e.preventDefault(); create.mutate({ data: { category: form.category, question: form.question, lawyerId: Number(form.lawyerId || lawyerList[0]?.id || 1), attachmentName: attachment || null } as any }, { onSuccess: () => { setForm({ ...form, question: '' }); setAttachment(''); queryClient.invalidateQueries({ queryKey: getListQuestionsQueryKey() }); } }); }; const answer = (q: any) => { if (!response) return; respond.mutate({ id: q.id, data: { response } as any }, { onSuccess: () => { setSelected(null); setResponse(''); queryClient.invalidateQueries({ queryKey: getListQuestionsQueryKey() }); } }); }; return <><PageHead eyebrow={`${lawyer ? 'lawyer' : 'citizen'} / questions`} title={lawyer ? 'Questions waiting for you' : 'Ask a lawyer'} description={lawyer ? 'Offer a careful first response to the questions assigned to your practice desk.' : 'Share the question, not your whole life story. A useful question has a date and a document when relevant.'} action={!lawyer && <Button onClick={() => document.getElementById('question-form')?.scrollIntoView({ behavior: 'smooth' })} data-testid="button-new-question"><Plus size={16} />Ask a question</Button>} /><div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]">{!lawyer && <Card id="question-form" className="h-fit p-6"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]"><MessageCircleQuestion size={21} /></div><h2 className="jc-serif mt-4 text-2xl font-bold">What would you like to understand?</h2><form onSubmit={submit} className="mt-5 grid gap-4"><label className="grid gap-1.5 text-sm font-semibold">Category<select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none" data-testid="select-question-category">{['Civil', 'Criminal', 'Family', 'Consumer', 'Property', 'Employment', 'General'].map(item => <option key={item}>{item}</option>)}</select></label><label className="grid gap-1.5 text-sm font-semibold">Sample lawyer<select value={form.lawyerId} onChange={e => setForm({ ...form, lawyerId: e.target.value })} className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none" data-testid="select-question-lawyer">{lawyerList.map(l => <option key={l.id} value={l.id}>{l.name} · {l.specialization}</option>)}</select></label><TextField label="Your question" value={form.question} onChange={e => setForm({ ...form, question: e.target.value })} placeholder="What does this notice mean for my next hearing?" required minLength={10} data-testid="textarea-question" /><label className="grid gap-1.5 text-sm font-semibold">Optional document<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e => setAttachment(e.target.files?.[0]?.name || '')} className="rounded-xl border border-dashed border-primary/25 bg-secondary/35 p-3 text-sm font-normal" data-testid="input-question-attachment" /></label>{attachment && <div className="rounded-lg bg-secondary px-3 py-2 text-xs">{attachment}</div>}<Button type="submit" disabled={create.isPending || lawyerQuery.isLoading} data-testid="button-send-question"><Send size={15} />Send question</Button></form><p className="mt-4 text-xs leading-5 text-muted-foreground">Responses are for orientation, not legal advice. Do not include sensitive personal information.</p></Card>}<Card className={cx('overflow-hidden', !lawyer && '')}><div className="border-b border-border px-5 py-4"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold">{lawyer ? 'Assigned queue' : 'Your questions'}</h2><Badge tone="blue">{list.length} records</Badge></div></div>{listQuery.isLoading ? <Loading rows={4} /> : list.length ? <div className="divide-y divide-border">{list.map(q => <div key={q.id} className="p-5" data-testid={`card-question-${q.id}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Badge tone={q.status === 'Answered' ? 'good' : 'warn'}>{q.status}</Badge><span className="text-xs text-muted-foreground">{q.category} · {fmt(q.createdAt)}</span></div>{lawyer && q.status === 'Pending' && <Button variant="outline" className="min-h-8 px-3 text-xs" onClick={() => setSelected(q)} data-testid={`button-answer-${q.id}`}>Answer</Button>}</div><p className="mt-3 font-semibold leading-6 text-primary">{q.question}</p>{q.attachmentName && <div className="mt-2 text-xs text-muted-foreground">Attachment: {q.attachmentName}</div>}{q.response && <div className="mt-3 rounded-xl bg-[#e7f1eb] p-4 text-sm leading-6 text-primary"><div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#3e8b73]">Response from {q.lawyerName || 'sample lawyer'}</div>{q.response}</div>}{selected?.id === q.id && <div className="mt-4 grid gap-3"><TextField label="Your response" value={response} onChange={(e: any) => setResponse(e.target.value)} minLength={10} placeholder="Share the helpful context you can offer…" data-testid={`textarea-response-${q.id}`} /><div className="flex gap-2"><Button onClick={() => answer(q)} disabled={respond.isPending} data-testid={`button-send-response-${q.id}`}><Send size={14} />Send response</Button><Button variant="quiet" onClick={() => setSelected(null)} data-testid={`button-cancel-response-${q.id}`}>Cancel</Button></div></div>}</div>)}</div> : <div className="p-5"><Empty icon={MessageCircleQuestion} title={lawyer ? 'The queue is clear' : 'No questions yet'} message={lawyer ? 'New citizen questions will arrive here.' : 'When you need a second perspective, start with a short, specific question.'} /></div>}</Card></div><PrototypeNote /></>; }
+function LegacyQuestionsPage({ lawyer = false }: { lawyer?: boolean }) {
+  const listQuery = useListQuestions();
+  const lawyerQuery = useListLawyers();
+  const create = useCreateQuestion();
+  const respond = useRespondToQuestion();
+  const [selected, setSelected] = useState<any>(null);
+  const [response, setResponse] = useState("");
+  const [attachment, setAttachment] = useState("");
+  const [form, setForm] = useState({
+    category: "Civil",
+    question: "",
+    lawyerId: "1",
+  });
+  const list: any[] = listQuery.data || [];
+  const lawyerList: any[] = lawyerQuery.data || [];
+  const submit = (e: any) => {
+    e.preventDefault();
+    create.mutate(
+      {
+        data: {
+          category: form.category,
+          question: form.question,
+          lawyerId: Number(form.lawyerId || lawyerList[0]?.id || 1),
+          attachmentName: attachment || null,
+        } as any,
+      },
+      {
+        onSuccess: () => {
+          setForm({ ...form, question: "" });
+          setAttachment("");
+          queryClient.invalidateQueries({
+            queryKey: getListQuestionsQueryKey(),
+          });
+        },
+      },
+    );
+  };
+  const answer = (q: any) => {
+    if (!response) return;
+    respond.mutate(
+      { id: q.id, data: { response } as any },
+      {
+        onSuccess: () => {
+          setSelected(null);
+          setResponse("");
+          queryClient.invalidateQueries({
+            queryKey: getListQuestionsQueryKey(),
+          });
+        },
+      },
+    );
+  };
+  return (
+    <>
+      <PageHead
+        eyebrow={`${lawyer ? "lawyer" : "citizen"} / questions`}
+        title={lawyer ? "Questions waiting for you" : "Ask a lawyer"}
+        description={
+          lawyer
+            ? "Offer a careful first response to the questions assigned to your practice desk."
+            : "Share the question, not your whole life story. A useful question has a date and a document when relevant."
+        }
+        action={
+          !lawyer && (
+            <Button
+              onClick={() =>
+                document
+                  .getElementById("question-form")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+              data-testid="button-new-question"
+            >
+              <Plus size={16} />
+              Ask a question
+            </Button>
+          )
+        }
+      />
+      <div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]">
+        {!lawyer && (
+          <Card id="question-form" className="h-fit p-6">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]">
+              <MessageCircleQuestion size={21} />
+            </div>
+            <h2 className="jc-serif mt-4 text-2xl font-bold">
+              What would you like to understand?
+            </h2>
+            <form onSubmit={submit} className="mt-5 grid gap-4">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Category
+                <select
+                  value={form.category}
+                  onChange={(e: any) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none"
+                  data-testid="select-question-category"
+                >
+                  {[
+                    "Civil",
+                    "Criminal",
+                    "Family",
+                    "Consumer",
+                    "Property",
+                    "Employment",
+                    "General",
+                  ].map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Sample lawyer
+                <select
+                  value={form.lawyerId}
+                  onChange={(e: any) =>
+                    setForm({ ...form, lawyerId: e.target.value })
+                  }
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none"
+                  data-testid="select-question-lawyer"
+                >
+                  {lawyerList.map((l: any) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} · {l.specialization}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <TextField
+                label="Your question"
+                value={form.question}
+                onChange={(e: any) => setForm({ ...form, question: e.target.value })}
+                placeholder="What does this notice mean for my next hearing?"
+                required
+                minLength={10}
+                data-testid="textarea-question"
+              />
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Optional document
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e: any) =>
+                    setAttachment(e.target.files?.[0]?.name || "")
+                  }
+                  className="rounded-xl border border-dashed border-primary/25 bg-secondary/35 p-3 text-sm font-normal"
+                  data-testid="input-question-attachment"
+                />
+              </label>
+              {attachment && (
+                <div className="rounded-lg bg-secondary px-3 py-2 text-xs">
+                  {attachment}
+                </div>
+              )}
+              <Button
+                type="submit"
+                disabled={create.isPending || lawyerQuery.isLoading}
+                data-testid="button-send-question"
+              >
+                <Send size={15} />
+                Send question
+              </Button>
+            </form>
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">
+              Responses are for orientation, not legal advice. Do not include
+              sensitive personal information.
+            </p>
+          </Card>
+        )}
+        <Card className={cx("overflow-hidden", !lawyer && "")}>
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-xl font-bold">
+                {lawyer ? "Assigned queue" : "Your questions"}
+              </h2>
+              <Badge tone="blue">{list.length} records</Badge>
+            </div>
+          </div>
+          {listQuery.isLoading ? (
+            <Loading rows={4} />
+          ) : list.length ? (
+            <div className="divide-y divide-border">
+              {list.map((q: any) => (
+                <div
+                  key={q.id}
+                  className="p-5"
+                  data-testid={`card-question-${q.id}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge tone={q.status === "Answered" ? "good" : "warn"}>
+                        {q.status}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {q.category} · {fmt(q.createdAt)}
+                      </span>
+                    </div>
+                    {lawyer && q.status === "Pending" && (
+                      <Button
+                        variant="outline"
+                        className="min-h-8 px-3 text-xs"
+                        onClick={() => setSelected(q)}
+                        data-testid={`button-answer-${q.id}`}
+                      >
+                        Answer
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-3 font-semibold leading-6 text-primary">
+                    {q.question}
+                  </p>
+                  {q.attachmentName && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Attachment: {q.attachmentName}
+                    </div>
+                  )}
+                  {q.response && (
+                    <div className="mt-3 rounded-xl bg-[#e7f1eb] p-4 text-sm leading-6 text-primary">
+                      <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#3e8b73]">
+                        Response from {q.lawyerName || "sample lawyer"}
+                      </div>
+                      {q.response}
+                    </div>
+                  )}
+                  {selected?.id === q.id && (
+                    <div className="mt-4 grid gap-3">
+                      <TextField
+                        label="Your response"
+                        value={response}
+                        onChange={(e: any) => setResponse(e.target.value)}
+                        minLength={10}
+                        placeholder="Share the helpful context you can offer…"
+                        data-testid={`textarea-response-${q.id}`}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => answer(q)}
+                          disabled={respond.isPending}
+                          data-testid={`button-send-response-${q.id}`}
+                        >
+                          <Send size={14} />
+                          Send response
+                        </Button>
+                        <Button
+                          variant="quiet"
+                          onClick={() => setSelected(null)}
+                          data-testid={`button-cancel-response-${q.id}`}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-5">
+              <Empty
+                icon={MessageCircleQuestion}
+                title={lawyer ? "The queue is clear" : "No questions yet"}
+                message={
+                  lawyer
+                    ? "New citizen questions will arrive here."
+                    : "When you need a second perspective, start with a short, specific question."
+                }
+              />
+            </div>
+          )}
+        </Card>
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
 
 // @ts-ignore - the compact prototype form uses untyped event handlers
-function LegacyComplaintsPage({ admin = false }: { admin?: boolean }) { const query = useListComplaints(); const create = useCreateComplaint(); const update = useUpdateComplaint(); const list: any[] = query.data || []; const [form, setForm] = useState({ category: 'Public service', description: '', location: '' }); const submit = (e: any) => { e.preventDefault(); create.mutate({ data: form as any }, { onSuccess: () => { setForm({ category: 'Public service', description: '', location: '' }); queryClient.invalidateQueries({ queryKey: getListComplaintsQueryKey() }); } }); }; return <><PageHead eyebrow={`${admin ? 'admin' : 'citizen'} / complaints`} title={admin ? 'Complaint desk' : 'Raise your voice'} description={admin ? 'Track reports with clear status and practical guidance.' : 'A structured place to report a public-service concern and see what happens next.'} />{!admin ? <div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]"><Card className="p-6"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#f7e7c2] text-[#795a17]"><CircleAlert size={21} /></div><h2 className="jc-serif mt-4 text-2xl font-bold">Tell us what happened</h2><form onSubmit={submit} className="mt-5 grid gap-4"><label className="grid gap-1.5 text-sm font-semibold">Category<select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="h-11 rounded-xl border border-input bg-background px-3 font-normal" data-testid="select-complaint-category"><option>Public service</option><option>Case delay</option><option>Access concern</option><option>Other</option></select></label><TextField label="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe the issue in your own words…" required minLength={10} data-testid="textarea-complaint" /><Field label="Location or office" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="District court, ward office…" required data-testid="input-complaint-location" /><Button type="submit" disabled={create.isPending} data-testid="button-submit-complaint"><Send size={15} />Submit report</Button></form></Card><ComplaintList list={list} /></div> : <ComplaintList list={list} admin update={update} />}{query.isLoading && <div className="mt-5"><Loading /></div>}<PrototypeNote /></>; }
+function LegacyComplaintsPage({ admin = false }: { admin?: boolean }) {
+  const query = useListComplaints();
+  const create = useCreateComplaint();
+  const update = useUpdateComplaint();
+  const list: any[] = query.data || [];
+  const [form, setForm] = useState({
+    category: "Public service",
+    description: "",
+    location: "",
+  });
+  const submit = (e: any) => {
+    e.preventDefault();
+    create.mutate(
+      { data: form as any },
+      {
+        onSuccess: () => {
+          setForm({
+            category: "Public service",
+            description: "",
+            location: "",
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListComplaintsQueryKey(),
+          });
+        },
+      },
+    );
+  };
+  return (
+    <>
+      <PageHead
+        eyebrow={`${admin ? "admin" : "citizen"} / complaints`}
+        title={admin ? "Complaint desk" : "Raise your voice"}
+        description={
+          admin
+            ? "Track reports with clear status and practical guidance."
+            : "A structured place to report a public-service concern and see what happens next."
+        }
+      />
+      {!admin ? (
+        <div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]">
+          <Card className="p-6">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#f7e7c2] text-[#795a17]">
+              <CircleAlert size={21} />
+            </div>
+            <h2 className="jc-serif mt-4 text-2xl font-bold">
+              Tell us what happened
+            </h2>
+            <form onSubmit={submit} className="mt-5 grid gap-4">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Category
+                <select
+                  value={form.category}
+                  onChange={(e: any) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal"
+                  data-testid="select-complaint-category"
+                >
+                  <option>Public service</option>
+                  <option>Case delay</option>
+                  <option>Access concern</option>
+                  <option>Other</option>
+                </select>
+              </label>
+              <TextField
+                label="Description"
+                value={form.description}
+                onChange={(e: any) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder="Describe the issue in your own words…"
+                required
+                minLength={10}
+                data-testid="textarea-complaint"
+              />
+              <Field
+                label="Location or office"
+                value={form.location}
+                onChange={(e: any) => setForm({ ...form, location: e.target.value })}
+                placeholder="District court, ward office…"
+                required
+                data-testid="input-complaint-location"
+              />
+              <Button
+                type="submit"
+                disabled={create.isPending}
+                data-testid="button-submit-complaint"
+              >
+                <Send size={15} />
+                Submit report
+              </Button>
+            </form>
+          </Card>
+          <ComplaintList list={list} />
+        </div>
+      ) : (
+        <ComplaintList list={list} admin update={update} />
+      )}
+      {query.isLoading && (
+        <div className="mt-5">
+          <Loading />
+        </div>
+      )}
+      <PrototypeNote />
+    </>
+  );
+}
 
 // @ts-ignore - the compact prototype form uses untyped event handlers
-function ComplaintsPage({ admin = false }: { admin?: boolean }) { const t = useCopy(); const query = useListComplaints(); const create = useCreateComplaint(); const update = useUpdateComplaint(); const list: any[] = query.data || []; const [form, setForm] = useState({ category: 'Public service', description: '', location: '' }); const submit = (e: any) => { e.preventDefault(); create.mutate({ data: form as any }, { onSuccess: () => { setForm({ category: 'Public service', description: '', location: '' }); queryClient.invalidateQueries({ queryKey: getListComplaintsQueryKey() }); } }); }; return <><PageHead eyebrow={`${admin ? 'admin' : 'citizen'} / complaints`} title={admin ? 'Complaint desk' : 'Raise your voice'} description={admin ? 'Track reports with clear status and practical guidance.' : 'A structured place to report a public-service concern and see what happens next.'} />{!admin ? <div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]"><Card className="p-6"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#f7e7c2] text-[#795a17]"><CircleAlert size={21} /></div><h2 className="jc-serif mt-4 text-2xl font-bold">{t('Tell us what happened')}</h2><form onSubmit={submit} className="mt-5 grid gap-4"><label className="grid gap-1.5 text-sm font-semibold">{t('Category')}<select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="h-11 rounded-xl border border-input bg-background px-3 font-normal" data-testid="select-complaint-category"><option>{t('Public service')}</option><option>{t('Case delay')}</option><option>{t('Access concern')}</option><option>{t('Other')}</option></select></label><TextField label={t('Description')} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder={t('Describe the issue in your own words…')} required minLength={10} data-testid="textarea-complaint" /><Field label={t('Location or office')} value={form.location} onChange={(e: any) => setForm({ ...form, location: e.target.value })} placeholder={t('District court, ward office…')} required data-testid="input-complaint-location" /><Button type="submit" disabled={create.isPending} data-testid="button-submit-complaint"><Send size={15} />{t('Submit report')}</Button></form></Card><ComplaintList list={list} /></div> : <ComplaintList list={list} admin update={update} />}{query.isLoading && <div className="mt-5"><Loading /></div>}<PrototypeNote /></>; }
-function ComplaintList({ list, admin = false, update }: any) { const t = useCopy(); return <Card className="overflow-hidden"><div className="border-b border-border px-5 py-4"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold">{t(admin ? 'All reports' : 'Your reports')}</h2><Badge tone="blue">{list.length} {t('records')}</Badge></div></div>{list.length ? <div className="divide-y divide-border">{list.map((c: any) => <div className="p-5" key={c.id}><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-bold text-primary">{t(c.category)}</div><div className="mt-1 text-xs text-muted-foreground">{c.location} · {fmt(c.createdAt)}</div></div><select value={c.status} onChange={e => update?.mutate({ id: c.id, data: { status: e.target.value } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListComplaintsQueryKey() }) })} disabled={!admin} className="rounded-full border border-border bg-secondary px-2 py-1 text-xs font-bold" data-testid={`select-complaint-status-${c.id}`}><option value="Submitted">{t('Submitted')}</option><option value="Under Review">{t('Under Review')}</option><option value="Guidance Provided">{t('Guidance Provided')}</option><option value="Closed">{t('Closed')}</option></select></div><p className="mt-3 text-sm leading-6 text-muted-foreground">{c.description}</p>{c.guidance && <div className="mt-3 rounded-xl bg-[#e7f1eb] p-3 text-sm text-primary"><b>{t('Guidance')}:</b> {c.guidance}</div>}</div>)}</div> : <div className="p-5"><Empty icon={CircleAlert} title={t('No reports to show')} message={t('Submitted concerns will be tracked here with their next status.')} /></div>}</Card>; }
+function ComplaintsPage({ admin = false }: { admin?: boolean }) {
+  const t = useCopy();
+  const query = useListComplaints();
+  const create = useCreateComplaint();
+  const update = useUpdateComplaint();
+  const list: any[] = query.data || [];
+  const [form, setForm] = useState({
+    category: "Public service",
+    description: "",
+    location: "",
+  });
+  const submit = (e: any) => {
+    e.preventDefault();
+    create.mutate(
+      { data: form as any },
+      {
+        onSuccess: () => {
+          setForm({
+            category: "Public service",
+            description: "",
+            location: "",
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListComplaintsQueryKey(),
+          });
+        },
+      },
+    );
+  };
+  return (
+    <>
+      <PageHead
+        eyebrow={`${admin ? "admin" : "citizen"} / complaints`}
+        title={admin ? "Complaint desk" : "Raise your voice"}
+        description={
+          admin
+            ? "Track reports with clear status and practical guidance."
+            : "A structured place to report a public-service concern and see what happens next."
+        }
+      />
+      {!admin ? (
+        <div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]">
+          <Card className="p-6">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#f7e7c2] text-[#795a17]">
+              <CircleAlert size={21} />
+            </div>
+            <h2 className="jc-serif mt-4 text-2xl font-bold">
+              {t("Tell us what happened")}
+            </h2>
+            <form onSubmit={submit} className="mt-5 grid gap-4">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                {t("Category")}
+                <select
+                  value={form.category}
+                  onChange={(e: any) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal"
+                  data-testid="select-complaint-category"
+                >
+                  <option>{t("Public service")}</option>
+                  <option>{t("Case delay")}</option>
+                  <option>{t("Access concern")}</option>
+                  <option>{t("Other")}</option>
+                </select>
+              </label>
+              <TextField
+                label={t("Description")}
+                value={form.description}
+                onChange={(e: any) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder={t("Describe the issue in your own words…")}
+                required
+                minLength={10}
+                data-testid="textarea-complaint"
+              />
+              <Field
+                label={t("Location or office")}
+                value={form.location}
+                onChange={(e: any) =>
+                  setForm({ ...form, location: e.target.value })
+                }
+                placeholder={t("District court, ward office…")}
+                required
+                data-testid="input-complaint-location"
+              />
+              <Button
+                type="submit"
+                disabled={create.isPending}
+                data-testid="button-submit-complaint"
+              >
+                <Send size={15} />
+                {t("Submit report")}
+              </Button>
+            </form>
+          </Card>
+          <ComplaintList list={list} />
+        </div>
+      ) : (
+        <ComplaintList list={list} admin update={update} />
+      )}
+      {query.isLoading && (
+        <div className="mt-5">
+          <Loading />
+        </div>
+      )}
+      <PrototypeNote />
+    </>
+  );
+}
+function ComplaintList({ list, admin = false, update }: any) {
+  const t = useCopy();
+  return (
+    <Card className="overflow-hidden">
+      <div className="border-b border-border px-5 py-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-xl font-bold">
+            {t(admin ? "All reports" : "Your reports")}
+          </h2>
+          <Badge tone="blue">
+            {list.length} {t("records")}
+          </Badge>
+        </div>
+      </div>
+      {list.length ? (
+        <div className="divide-y divide-border">
+          {list.map((c: any) => (
+            <div className="p-5" key={c.id}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-bold text-primary">{t(c.category)}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {c.location} · {fmt(c.createdAt)}
+                  </div>
+                </div>
+                <select
+                  value={c.status}
+                  onChange={(e: any) =>
+                    update?.mutate(
+                      { id: c.id, data: { status: e.target.value } as any },
+                      {
+                        onSuccess: () =>
+                          queryClient.invalidateQueries({
+                            queryKey: getListComplaintsQueryKey(),
+                          }),
+                      },
+                    )
+                  }
+                  disabled={!admin}
+                  className="rounded-full border border-border bg-secondary px-2 py-1 text-xs font-bold"
+                  data-testid={`select-complaint-status-${c.id}`}
+                >
+                  <option value="Submitted">{t("Submitted")}</option>
+                  <option value="Under Review">{t("Under Review")}</option>
+                  <option value="Guidance Provided">
+                    {t("Guidance Provided")}
+                  </option>
+                  <option value="Closed">{t("Closed")}</option>
+                </select>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {c.description}
+              </p>
+              {c.guidance && (
+                <div className="mt-3 rounded-xl bg-[#e7f1eb] p-3 text-sm text-primary">
+                  <b>{t("Guidance")}:</b> {c.guidance}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-5">
+          <Empty
+            icon={CircleAlert}
+            title={t("No reports to show")}
+            message={t(
+              "Submitted concerns will be tracked here with their next status.",
+            )}
+          />
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function QuestionsPage({ lawyer = false }: { lawyer?: boolean }) {
   const t = useCopy();
@@ -331,25 +4914,282 @@ function QuestionsPage({ lawyer = false }: { lawyer?: boolean }) {
   const create = useCreateQuestion();
   const respond = useRespondToQuestion();
   const [selected, setSelected] = useState<any>(null);
-  const [response, setResponse] = useState('');
-  const [attachment, setAttachment] = useState('');
-  const [form, setForm] = useState({ category: 'Civil', question: '', lawyerId: '1' });
+  const [response, setResponse] = useState("");
+  const [attachment, setAttachment] = useState("");
+  const [form, setForm] = useState({
+    category: "Civil",
+    question: "",
+    lawyerId: "1",
+  });
   const list: any[] = listQuery.data || [];
   const lawyerList: any[] = lawyerQuery.data || [];
   const submit = (e: any) => {
     e.preventDefault();
-    create.mutate({ data: { ...form, lawyerId: Number(form.lawyerId || lawyerList[0]?.id || 1), attachmentName: attachment || null } as any }, {
-      onSuccess: () => { setForm({ ...form, question: '' }); setAttachment(''); queryClient.invalidateQueries({ queryKey: getListQuestionsQueryKey() }); },
-    });
+    create.mutate(
+      {
+        data: {
+          ...form,
+          lawyerId: Number(form.lawyerId || lawyerList[0]?.id || 1),
+          attachmentName: attachment || null,
+        } as any,
+      },
+      {
+        onSuccess: () => {
+          setForm({ ...form, question: "" });
+          setAttachment("");
+          queryClient.invalidateQueries({
+            queryKey: getListQuestionsQueryKey(),
+          });
+        },
+      },
+    );
   };
   const answer = (q: any) => {
     if (!response) return;
-    respond.mutate({ id: q.id, data: { response } as any }, {
-      onSuccess: () => { setSelected(null); setResponse(''); queryClient.invalidateQueries({ queryKey: getListQuestionsQueryKey() }); },
-    });
+    respond.mutate(
+      { id: q.id, data: { response } as any },
+      {
+        onSuccess: () => {
+          setSelected(null);
+          setResponse("");
+          queryClient.invalidateQueries({
+            queryKey: getListQuestionsQueryKey(),
+          });
+        },
+      },
+    );
   };
   // @ts-ignore - compact JSX form uses untyped event handlers
-  return <><PageHead eyebrow={`${lawyer ? 'lawyer' : 'citizen'} / questions`} title={lawyer ? 'Questions waiting for you' : 'Ask a lawyer'} description={lawyer ? 'Offer a careful first response to the questions assigned to your practice desk.' : 'Share the question, not your whole life story. A useful question has a date and a document when relevant.'} action={!lawyer && <Button onClick={() => document.getElementById('question-form')?.scrollIntoView({ behavior: 'smooth' })} data-testid="button-new-question"><Plus size={16} />{t('Ask a question')}</Button>} /><div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]">{!lawyer && <Card id="question-form" className="h-fit p-6"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]"><MessageCircleQuestion size={21} /></div><h2 className="jc-serif mt-4 text-2xl font-bold">{t('What would you like to understand?')}</h2><form onSubmit={submit} className="mt-5 grid gap-4"><label className="grid gap-1.5 text-sm font-semibold">{t('Category')}<select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none" data-testid="select-question-category">{['Civil', 'Criminal', 'Family', 'Consumer', 'Property', 'Employment', 'General'].map(item => <option key={item}>{t(item)}</option>)}</select></label><label className="grid gap-1.5 text-sm font-semibold">{t('Sample lawyer')}<select value={form.lawyerId} onChange={e => setForm({ ...form, lawyerId: e.target.value })} className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none" data-testid="select-question-lawyer">{lawyerList.map(l => <option key={l.id} value={l.id}>{l.name} · {l.specialization}</option>)}</select></label><TextField label={t('Your question')} value={form.question} onChange={e => setForm({ ...form, question: e.target.value })} placeholder={t('What does this notice mean for my next hearing?')} required minLength={10} data-testid="textarea-question" /><label className="grid gap-1.5 text-sm font-semibold">{t('Optional document')}<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e => setAttachment(e.target.files?.[0]?.name || '')} className="rounded-xl border border-dashed border-primary/25 bg-secondary/35 p-3 text-sm font-normal" data-testid="input-question-attachment" /></label>{attachment && <div className="rounded-lg bg-secondary px-3 py-2 text-xs">{attachment}</div>}<Button type="submit" disabled={create.isPending || lawyerQuery.isLoading} data-testid="button-send-question"><Send size={15} />{t('Send question')}</Button></form><p className="mt-4 text-xs leading-5 text-muted-foreground">{t('Responses are for orientation, not legal advice. Do not include sensitive personal information.')}</p></Card>}<Card className="overflow-hidden"><div className="border-b border-border px-5 py-4"><div className="flex items-center justify-between"><h2 className="font-serif text-xl font-bold">{t(lawyer ? 'Assigned queue' : 'Your questions')}</h2><Badge tone="blue">{list.length} {t('records')}</Badge></div></div>{listQuery.isLoading ? <Loading rows={4} /> : list.length ? <div className="divide-y divide-border">{list.map(q => <div key={q.id} className="p-5" data-testid={`card-question-${q.id}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Badge tone={q.status === 'Answered' ? 'good' : 'warn'}>{t(q.status)}</Badge><span className="text-xs text-muted-foreground">{t(q.category)} · {fmt(q.createdAt)}</span></div>{lawyer && q.status === 'Pending' && <Button variant="outline" className="min-h-8 px-3 text-xs" onClick={() => setSelected(q)} data-testid={`button-answer-${q.id}`}>{t('Answer')}</Button>}</div><p className="mt-3 font-semibold leading-6 text-primary">{q.question}</p>{q.attachmentName && <div className="mt-2 text-xs text-muted-foreground">{t('Attachment')}: {q.attachmentName}</div>}{q.response && <div className="mt-3 rounded-xl bg-[#e7f1eb] p-4 text-sm leading-6 text-primary"><div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#3e8b73]">{t('Response from')} {q.lawyerName || t('sample lawyer')}</div>{q.response}</div>}{selected?.id === q.id && <div className="mt-4 grid gap-3"><TextField label={t('Your response')} value={response} onChange={(e: any) => setResponse(e.target.value)} minLength={10} placeholder={t('Share the helpful context you can offer…')} data-testid={`textarea-response-${q.id}`} /><div className="flex gap-2"><Button onClick={() => answer(q)} disabled={respond.isPending} data-testid={`button-send-response-${q.id}`}><Send size={14} />{t('Send response')}</Button><Button variant="quiet" onClick={() => setSelected(null)} data-testid={`button-cancel-response-${q.id}`}>{t('Cancel')}</Button></div></div>}</div>)}</div> : <div className="p-5"><Empty icon={MessageCircleQuestion} title={t(lawyer ? 'The queue is clear' : 'No questions yet')} message={t(lawyer ? 'New citizen questions will arrive here.' : 'When you need a second perspective, start with a short, specific question.')} /></div>}</Card></div><PrototypeNote /></>;
+  return (
+    <>
+      <PageHead
+        eyebrow={`${lawyer ? "lawyer" : "citizen"} / questions`}
+        title={lawyer ? "Questions waiting for you" : "Ask a lawyer"}
+        description={
+          lawyer
+            ? "Offer a careful first response to the questions assigned to your practice desk."
+            : "Share the question, not your whole life story. A useful question has a date and a document when relevant."
+        }
+        action={
+          !lawyer && (
+            <Button
+              onClick={() =>
+                document
+                  .getElementById("question-form")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+              data-testid="button-new-question"
+            >
+              <Plus size={16} />
+              {t("Ask a question")}
+            </Button>
+          )
+        }
+      />
+      <div className="grid gap-6 lg:grid-cols-[.75fr_1.25fr]">
+        {!lawyer && (
+          <Card id="question-form" className="h-fit p-6">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]">
+              <MessageCircleQuestion size={21} />
+            </div>
+            <h2 className="jc-serif mt-4 text-2xl font-bold">
+              {t("What would you like to understand?")}
+            </h2>
+            <form onSubmit={submit} className="mt-5 grid gap-4">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                {t("Category")}
+                <select
+                  value={form.category}
+                  onChange={(e: any) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none"
+                  data-testid="select-question-category"
+                >
+                  {[
+                    "Civil",
+                    "Criminal",
+                    "Family",
+                    "Consumer",
+                    "Property",
+                    "Employment",
+                    "General",
+                  ].map((item) => (
+                    <option key={item}>{t(item)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold">
+                {t("Sample lawyer")}
+                <select
+                  value={form.lawyerId}
+                  onChange={(e: any) =>
+                    setForm({ ...form, lawyerId: e.target.value })
+                  }
+                  className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none"
+                  data-testid="select-question-lawyer"
+                >
+                  {lawyerList.map((l: any) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} · {l.specialization}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <TextField
+                label={t("Your question")}
+                value={form.question}
+                onChange={(e: any) => setForm({ ...form, question: e.target.value })}
+                placeholder={t(
+                  "What does this notice mean for my next hearing?",
+                )}
+                required
+                minLength={10}
+                data-testid="textarea-question"
+              />
+              <label className="grid gap-1.5 text-sm font-semibold">
+                {t("Optional document")}
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e: any) =>
+                    setAttachment(e.target.files?.[0]?.name || "")
+                  }
+                  className="rounded-xl border border-dashed border-primary/25 bg-secondary/35 p-3 text-sm font-normal"
+                  data-testid="input-question-attachment"
+                />
+              </label>
+              {attachment && (
+                <div className="rounded-lg bg-secondary px-3 py-2 text-xs">
+                  {attachment}
+                </div>
+              )}
+              <Button
+                type="submit"
+                disabled={create.isPending || lawyerQuery.isLoading}
+                data-testid="button-send-question"
+              >
+                <Send size={15} />
+                {t("Send question")}
+              </Button>
+            </form>
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">
+              {t(
+                "Responses are for orientation, not legal advice. Do not include sensitive personal information.",
+              )}
+            </p>
+          </Card>
+        )}
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-xl font-bold">
+                {t(lawyer ? "Assigned queue" : "Your questions")}
+              </h2>
+              <Badge tone="blue">
+                {list.length} {t("records")}
+              </Badge>
+            </div>
+          </div>
+          {listQuery.isLoading ? (
+            <Loading rows={4} />
+          ) : list.length ? (
+            <div className="divide-y divide-border">
+              {list.map((q: any) => (
+                <div
+                  key={q.id}
+                  className="p-5"
+                  data-testid={`card-question-${q.id}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge tone={q.status === "Answered" ? "good" : "warn"}>
+                        {t(q.status)}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {t(q.category)} · {fmt(q.createdAt)}
+                      </span>
+                    </div>
+                    {lawyer && q.status === "Pending" && (
+                      <Button
+                        variant="outline"
+                        className="min-h-8 px-3 text-xs"
+                        onClick={() => setSelected(q)}
+                        data-testid={`button-answer-${q.id}`}
+                      >
+                        {t("Answer")}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-3 font-semibold leading-6 text-primary">
+                    {q.question}
+                  </p>
+                  {q.attachmentName && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {t("Attachment")}: {q.attachmentName}
+                    </div>
+                  )}
+                  {q.response && (
+                    <div className="mt-3 rounded-xl bg-[#e7f1eb] p-4 text-sm leading-6 text-primary">
+                      <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#3e8b73]">
+                        {t("Response from")}{" "}
+                        {q.lawyerName || t("sample lawyer")}
+                      </div>
+                      {q.response}
+                    </div>
+                  )}
+                  {selected?.id === q.id && (
+                    <div className="mt-4 grid gap-3">
+                      <TextField
+                        label={t("Your response")}
+                        value={response}
+                        onChange={(e: any) => setResponse(e.target.value)}
+                        minLength={10}
+                        placeholder={t(
+                          "Share the helpful context you can offer…",
+                        )}
+                        data-testid={`textarea-response-${q.id}`}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => answer(q)}
+                          disabled={respond.isPending}
+                          data-testid={`button-send-response-${q.id}`}
+                        >
+                          <Send size={14} />
+                          {t("Send response")}
+                        </Button>
+                        <Button
+                          variant="quiet"
+                          onClick={() => setSelected(null)}
+                          data-testid={`button-cancel-response-${q.id}`}
+                        >
+                          {t("Cancel")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-5">
+              <Empty
+                icon={MessageCircleQuestion}
+                title={t(lawyer ? "The queue is clear" : "No questions yet")}
+                message={t(
+                  lawyer
+                    ? "New citizen questions will arrive here."
+                    : "When you need a second perspective, start with a short, specific question.",
+                )}
+              />
+            </div>
+          )}
+        </Card>
+      </div>
+      <PrototypeNote />
+    </>
+  );
 }
 
 function AwarenessPage({ admin = false }: { admin?: boolean }) {
@@ -361,17 +5201,495 @@ function AwarenessPage({ admin = false }: { admin?: boolean }) {
   const t = useCopy();
   const list: any[] = query.data || [];
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ title: '', category: 'Know your rights', summary: '', content: '', language: 'English', published: true });
-  const open = (a?: any) => { setEditing(a || { id: 0 }); setForm(a ? { title: a.title, category: a.category, summary: a.summary, content: a.content, language: a.language, published: a.published } : { title: '', category: 'Know your rights', summary: '', content: '', language: 'English', published: true }); };
-  const save = (e: any) => { e.preventDefault(); const fn: any = editing?.id ? update : create; const vars: any = editing?.id ? { id: editing.id, data: form } : { data: form }; fn.mutate(vars, { onSuccess: () => { setEditing(null); queryClient.invalidateQueries({ queryKey: getListAwarenessQueryKey() }); } }); };
-  return <><PageHead eyebrow={`${admin ? 'admin' : 'citizen'} / awareness`} title={admin ? 'Awareness library' : 'Know your rights'} description={admin ? 'Publish short, useful articles for the public.' : 'Short reads for the moments when knowing the process can make it feel less heavy.'} action={admin && <Button onClick={() => open()} data-testid="button-new-awareness"><Plus size={16} />{t('New article')}</Button>} />
-    {!admin && <section className="mb-7"><div className="mb-4 flex items-end justify-between gap-4"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">{t('Common rights')}</div><h2 className="jc-serif mt-2 text-3xl font-bold text-primary">{t('A few rights worth knowing')}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{t('These short explanations are general education, not a substitute for advice about your circumstances.')}</p></div><Scale className="hidden text-accent sm:block" size={28} /></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{commonRights.map(right => <Card key={right.title} className="p-4"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]"><ShieldCheck size={17} /></div><h3 className="mt-4 font-serif font-bold text-primary">{language === 'Tamil' ? right.tamilTitle : right.title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{language === 'Tamil' ? right.tamilText : right.text}</p></Card>)}</div></section>}
-    {admin && editing && <Card className="mb-6 p-6"><form onSubmit={save} className="grid gap-4"><div className="grid gap-4 sm:grid-cols-2"><Field label={t('Title')} value={form.title} onChange={(e: any) => setForm({ ...form, title: e.target.value })} required data-testid="input-awareness-title" /><Field label={t('Category')} value={form.category} onChange={(e: any) => setForm({ ...form, category: e.target.value })} required data-testid="input-awareness-category" /></div><Field label={t('Summary')} value={form.summary} onChange={(e: any) => setForm({ ...form, summary: e.target.value })} required data-testid="input-awareness-summary" /><TextField label={t('Content')} value={form.content} onChange={(e: any) => setForm({ ...form, content: e.target.value })} required minLength={10} data-testid="textarea-awareness-content" /><div className="flex gap-2"><Button type="submit" data-testid="button-save-awareness"><Check size={15} />{t('Save article')}</Button><Button type="button" variant="quiet" onClick={() => setEditing(null)} data-testid="button-cancel-awareness">{t('Cancel')}</Button></div></form></Card>}
-    <div className="grid gap-4 md:grid-cols-2">{query.isLoading ? <Loading rows={4} /> : list.length ? list.map(a => <Card key={a.id} className="p-5"><div className="flex items-start justify-between gap-3"><Badge tone="blue">{a.category}</Badge>{admin && <div className="flex gap-1"><button className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-primary" onClick={() => open(a)} data-testid={`button-edit-awareness-${a.id}`}><Pencil size={15} /></button><button className="rounded-lg p-2 text-muted-foreground hover:bg-[#f8dbd4] hover:text-[#8d372d]" onClick={() => remove.mutate({ id: a.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAwarenessQueryKey() }) })} data-testid={`button-delete-awareness-${a.id}`}><X size={15} /></button></div>}</div><h2 className="jc-serif mt-4 text-2xl font-bold text-primary">{t(a.title)}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{t(a.summary)}</p><div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground"><span>{t(a.language)} · {t(a.published ? 'Published' : 'Draft')}</span><button onClick={() => { const target = document.getElementById(`article-${a.id}`); target?.classList.toggle('hidden'); }} className="font-bold text-primary underline underline-offset-4" data-testid={`button-read-awareness-${a.id}`}>{t('Read article')}</button></div><div id={`article-${a.id}`} className="mt-4 hidden border-t border-border pt-4 text-sm leading-7 text-muted-foreground">{t(a.content)}</div></Card>) : <div className="md:col-span-2"><Empty icon={BookOpen} title="The library is quiet" message="New plain-language reads will appear here." /></div>}</div><PrototypeNote /></>;
+  const [form, setForm] = useState({
+    title: "",
+    category: "Know your rights",
+    summary: "",
+    content: "",
+    language: "English",
+    published: true,
+  });
+  const open = (a?: any) => {
+    setEditing(a || { id: 0 });
+    setForm(
+      a
+        ? {
+            title: a.title,
+            category: a.category,
+            summary: a.summary,
+            content: a.content,
+            language: a.language,
+            published: a.published,
+          }
+        : {
+            title: "",
+            category: "Know your rights",
+            summary: "",
+            content: "",
+            language: "English",
+            published: true,
+          },
+    );
+  };
+  const save = (e: any) => {
+    e.preventDefault();
+    const fn: any = editing?.id ? update : create;
+    const vars: any = editing?.id
+      ? { id: editing.id, data: form }
+      : { data: form };
+    fn.mutate(vars, {
+      onSuccess: () => {
+        setEditing(null);
+        queryClient.invalidateQueries({ queryKey: getListAwarenessQueryKey() });
+      },
+    });
+  };
+  return (
+    <>
+      <PageHead
+        eyebrow={`${admin ? "admin" : "citizen"} / awareness`}
+        title={admin ? "Awareness library" : "Know your rights"}
+        description={
+          admin
+            ? "Publish short, useful articles for the public."
+            : "Short reads for the moments when knowing the process can make it feel less heavy."
+        }
+        action={
+          admin && (
+            <Button onClick={() => open()} data-testid="button-new-awareness">
+              <Plus size={16} />
+              {t("New article")}
+            </Button>
+          )
+        }
+      />
+      {!admin && (
+        <section className="mb-7">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">
+                {t("Common rights")}
+              </div>
+              <h2 className="jc-serif mt-2 text-3xl font-bold text-primary">
+                {t("A few rights worth knowing")}
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {t(
+                  "These short explanations are general education, not a substitute for advice about your circumstances.",
+                )}
+              </p>
+            </div>
+            <Scale className="hidden text-accent sm:block" size={28} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {commonRights.map((right) => (
+              <Card key={right.title} className="p-4">
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#dbe9eb] text-[#255c67]">
+                  <ShieldCheck size={17} />
+                </div>
+                <h3 className="mt-4 font-serif font-bold text-primary">
+                  {language === "Tamil" ? right.tamilTitle : right.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {language === "Tamil" ? right.tamilText : right.text}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      {admin && editing && (
+        <Card className="mb-6 p-6">
+          <form onSubmit={save} className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label={t("Title")}
+                value={form.title}
+                onChange={(e: any) =>
+                  setForm({ ...form, title: e.target.value })
+                }
+                required
+                data-testid="input-awareness-title"
+              />
+              <Field
+                label={t("Category")}
+                value={form.category}
+                onChange={(e: any) =>
+                  setForm({ ...form, category: e.target.value })
+                }
+                required
+                data-testid="input-awareness-category"
+              />
+            </div>
+            <Field
+              label={t("Summary")}
+              value={form.summary}
+              onChange={(e: any) =>
+                setForm({ ...form, summary: e.target.value })
+              }
+              required
+              data-testid="input-awareness-summary"
+            />
+            <TextField
+              label={t("Content")}
+              value={form.content}
+              onChange={(e: any) =>
+                setForm({ ...form, content: e.target.value })
+              }
+              required
+              minLength={10}
+              data-testid="textarea-awareness-content"
+            />
+            <div className="flex gap-2">
+              <Button type="submit" data-testid="button-save-awareness">
+                <Check size={15} />
+                {t("Save article")}
+              </Button>
+              <Button
+                type="button"
+                variant="quiet"
+                onClick={() => setEditing(null)}
+                data-testid="button-cancel-awareness"
+              >
+                {t("Cancel")}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        {query.isLoading ? (
+          <Loading rows={4} />
+        ) : list.length ? (
+          list.map((a) => (
+            <Card key={a.id} className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <Badge tone="blue">{a.category}</Badge>
+                {admin && (
+                  <div className="flex gap-1">
+                    <button
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-primary"
+                      onClick={() => open(a)}
+                      data-testid={`button-edit-awareness-${a.id}`}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-[#f8dbd4] hover:text-[#8d372d]"
+                      onClick={() =>
+                        remove.mutate(
+                          { id: a.id },
+                          {
+                            onSuccess: () =>
+                              queryClient.invalidateQueries({
+                                queryKey: getListAwarenessQueryKey(),
+                              }),
+                          },
+                        )
+                      }
+                      data-testid={`button-delete-awareness-${a.id}`}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <h2 className="jc-serif mt-4 text-2xl font-bold text-primary">
+                {t(a.title)}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {t(a.summary)}
+              </p>
+              <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
+                <span>
+                  {t(a.language)} · {t(a.published ? "Published" : "Draft")}
+                </span>
+                <button
+                  onClick={() => {
+                    const target = document.getElementById(`article-${a.id}`);
+                    target?.classList.toggle("hidden");
+                  }}
+                  className="font-bold text-primary underline underline-offset-4"
+                  data-testid={`button-read-awareness-${a.id}`}
+                >
+                  {t("Read article")}
+                </button>
+              </div>
+              <div
+                id={`article-${a.id}`}
+                className="mt-4 hidden border-t border-border pt-4 text-sm leading-7 text-muted-foreground"
+              >
+                {t(a.content)}
+              </div>
+            </Card>
+          ))
+        ) : (
+          <div className="md:col-span-2">
+            <Empty
+              icon={BookOpen}
+              title="The library is quiet"
+              message="New plain-language reads will appear here."
+            />
+          </div>
+        )}
+      </div>
+      <PrototypeNote />
+    </>
+  );
 }
 
-function UsersPage() { const me = useGetMe(); const cases = useListCases(); const lawyers = useListLawyers(); const questions = useListQuestions(); const user = me.data; const people = [{ name: user?.name || 'Meera Krishnan', email: user?.email || 'citizen@example.com', role: 'Citizen', detail: 'Language: English' }, { name: 'Arjun Menon', email: 'arjun.menon@example.com', role: 'Lawyer', detail: 'Property law' }, { name: 'System desk', email: 'admin@example.com', role: 'Administrator', detail: 'Steward account' }]; return <><PageHead eyebrow="admin / people" title="User management" description="A compact view of the demo network. Sensitive identity verification is intentionally out of scope." /><Card className="overflow-hidden"><div className="border-b border-border bg-secondary/30 p-4"><div className="relative max-w-md"><Search size={17} className="absolute left-3 top-3 text-muted-foreground" /><input placeholder="Search people" className="h-11 w-full rounded-xl border border-input bg-card pl-10 outline-none" data-testid="input-search-users" /></div></div><div className="divide-y divide-border">{people.map((p, i) => <div className="flex items-center gap-4 p-5" key={p.email} data-testid={`row-user-${i}`}><div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{p.name.slice(0, 2).toUpperCase()}</div><div className="min-w-0 flex-1"><div className="font-bold text-primary">{p.name}</div><div className="text-sm text-muted-foreground">{p.email}</div></div><div className="hidden text-right sm:block"><Badge tone={p.role === 'Administrator' ? 'warn' : 'blue'}>{p.role}</Badge><div className="mt-1 text-xs text-muted-foreground">{p.detail}</div></div><button className="rounded-lg p-2 text-muted-foreground hover:bg-secondary" data-testid={`button-user-menu-${i}`}><Settings size={16} /></button></div>)}</div></Card><div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat label="Visible cases" value={cases.data?.length ?? '—'} /><MiniStat label="Lawyer profiles" value={lawyers.data?.length ?? '—'} /><MiniStat label="Questions routed" value={questions.data?.length ?? '—'} /></div><PrototypeNote /></>; }
-function MiniStat({ label, value }: any) { return <Card className="p-4"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 text-2xl font-bold text-primary">{value}</div></Card>; }
+function UsersPage() {
+  const me = useGetMe();
+  const cases = useListCases();
+  const lawyers = useListLawyers();
+  const questions = useListQuestions();
+  const user = me.data;
+  const people = [
+    {
+      name: user?.name || "Meera Krishnan",
+      email: user?.email || "citizen@example.com",
+      role: "Citizen",
+      detail: "Language: English",
+    },
+    {
+      name: "Arjun Menon",
+      email: "arjun.menon@example.com",
+      role: "Lawyer",
+      detail: "Property law",
+    },
+    {
+      name: "System desk",
+      email: "admin@example.com",
+      role: "Administrator",
+      detail: "Steward account",
+    },
+  ];
+  return (
+    <>
+      <PageHead
+        eyebrow="admin / people"
+        title="User management"
+        description="A compact view of the demo network. Sensitive identity verification is intentionally out of scope."
+      />
+      <Card className="overflow-hidden">
+        <div className="border-b border-border bg-secondary/30 p-4">
+          <div className="relative max-w-md">
+            <Search
+              size={17}
+              className="absolute left-3 top-3 text-muted-foreground"
+            />
+            <input
+              placeholder="Search people"
+              className="h-11 w-full rounded-xl border border-input bg-card pl-10 outline-none"
+              data-testid="input-search-users"
+            />
+          </div>
+        </div>
+        <div className="divide-y divide-border">
+          {people.map((p, i) => (
+            <div
+              className="flex items-center gap-4 p-5"
+              key={p.email}
+              data-testid={`row-user-${i}`}
+            >
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {p.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-primary">{p.name}</div>
+                <div className="text-sm text-muted-foreground">{p.email}</div>
+              </div>
+              <div className="hidden text-right sm:block">
+                <Badge tone={p.role === "Administrator" ? "warn" : "blue"}>
+                  {p.role}
+                </Badge>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {p.detail}
+                </div>
+              </div>
+              <button
+                className="rounded-lg p-2 text-muted-foreground hover:bg-secondary"
+                data-testid={`button-user-menu-${i}`}
+              >
+                <Settings size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <MiniStat label="Visible cases" value={cases.data?.length ?? "—"} />
+        <MiniStat label="Lawyer profiles" value={lawyers.data?.length ?? "—"} />
+        <MiniStat
+          label="Questions routed"
+          value={questions.data?.length ?? "—"}
+        />
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
+function MiniStat({ label, value }: any) {
+  return (
+    <Card className="p-4">
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </Card>
+  );
+}
+
+function CitizenAppointments() {
+  const query = useListAppointments();
+  const t = useCopy();
+
+  if (query.isLoading) return <div className="p-8 text-center text-muted-foreground">{t("Loading requests...")}</div>;
+  if (query.isError) return <div className="p-8 text-center text-red-500">{t("Error loading requests")}</div>;
+
+  const appointments = query.data || [];
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-8">
+      <PageHead
+        eyebrow={t("Citizen Workspace")}
+        title={t("My Requests")}
+        description={t("Track your appointment requests sent to lawyers.")}
+      />
+      <div className="mt-8 grid gap-4">
+        {appointments.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+            {t("You have not sent any requests yet.")}
+          </div>
+        ) : (
+          appointments.map((appt: any) => (
+            <Card key={appt.id} className="p-5">
+              <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                <div className="w-full">
+                  <div className="text-xs font-bold uppercase text-accent mb-1">{appt.status}</div>
+                  <h3 className="font-bold text-lg text-primary">{appt.subject}</h3>
+                  {appt.caseNumber && (
+                    <div className="text-xs font-semibold text-primary mt-1">Case Ref: {appt.caseNumber}</div>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-1">{appt.description}</p>
+                  <div className="text-xs text-muted-foreground mt-3">
+                    {t("Case Type")}: {appt.caseType} • {t("Date")}: {fmt(appt.createdAt)}
+                  </div>
+                  {appt.status === "ACCEPTED" && appt.scheduledDate && (
+                    <div className="mt-3 rounded-lg bg-[#e7f1eb] p-3 text-sm text-[#3e8b73]">
+                      <b>Scheduled:</b> {appt.scheduledDate} at {appt.scheduledTime} ({appt.scheduledPlace})
+                    </div>
+                  )}
+                  {appt.status === "REJECTED" && (
+                    <div className="mt-3 rounded-lg bg-[#f8dbd4] p-3 text-sm text-[#8d372d]">
+                      {t("The lawyer has declined this request.")}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LawyerAppointments() {
+  const query = useListAppointments();
+  const updateStatus = useUpdateAppointmentStatus();
+  const t = useCopy();
+
+  const [acceptingId, setAcceptingId] = useState<number | null>(null);
+  const [form, setForm] = useState({ date: "", time: "", place: "" });
+
+  if (query.isLoading) return <div className="p-8 text-center text-muted-foreground">{t("Loading appointments...")}</div>;
+  if (query.isError) return <div className="p-8 text-center text-red-500">{t("Error loading appointments")}</div>;
+
+  const appointments = query.data || [];
+
+  const handleAccept = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!acceptingId) return;
+    updateStatus.mutate(
+      { id: acceptingId, data: { status: "ACCEPTED", scheduledDate: form.date, scheduledTime: form.time, scheduledPlace: form.place } },
+      { onSuccess: () => { setAcceptingId(null); setForm({ date: "", time: "", place: "" }); } }
+    );
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-8">
+      <PageHead
+        eyebrow={t("Lawyer Workspace")}
+        title={t("Appointment Orders")}
+        description={t("Review and manage citizen requests for representation.")}
+      />
+      <div className="mt-8 grid gap-4">
+        {appointments.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+            {t("No appointment orders found.")}
+          </div>
+        ) : (
+          appointments.map((appt: any) => (
+            <Card key={appt.id} className="p-5">
+              <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                <div className="w-full">
+                  <div className="text-xs font-bold uppercase text-accent mb-1">{appt.status}</div>
+                  <h3 className="font-bold text-lg text-primary">{appt.subject}</h3>
+                  {appt.caseNumber && (
+                    <div className="text-xs font-semibold text-primary mt-1">Case Ref: {appt.caseNumber}</div>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-1">{appt.description}</p>
+                  <div className="text-xs text-muted-foreground mt-3">
+                    {t("Case Type")}: {appt.caseType} • {t("Date")}: {fmt(appt.createdAt)}
+                  </div>
+                  {appt.scheduledDate && (
+                    <div className="mt-3 rounded-lg bg-[#e7f1eb] p-3 text-sm text-[#3e8b73]">
+                      <b>Scheduled:</b> {appt.scheduledDate} at {appt.scheduledTime} ({appt.scheduledPlace})
+                    </div>
+                  )}
+                </div>
+                {appt.status === "PENDING" && (
+                  <div className="flex flex-col gap-2 shrink-0 sm:w-64">
+                    {acceptingId === appt.id ? (
+                      <form onSubmit={handleAccept} className="grid gap-2 mt-2 sm:mt-0 p-3 border rounded-xl bg-muted/30">
+                        <input required type="date" className="h-9 rounded-md border px-2 text-sm" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+                        <input required type="time" className="h-9 rounded-md border px-2 text-sm" value={form.time} onChange={e => setForm({...form, time: e.target.value})} />
+                        <input required placeholder="Location / Meeting link" className="h-9 rounded-md border px-2 text-sm" value={form.place} onChange={e => setForm({...form, place: e.target.value})} />
+                        <div className="flex gap-2 mt-1">
+                          <Button size="sm" type="submit" className="w-full">{t("Confirm")}</Button>
+                          <Button size="sm" variant="outline" type="button" onClick={() => setAcceptingId(null)}>{t("Cancel")}</Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => updateStatus.mutate({ id: appt.id, data: { status: "REJECTED" } })}
+                          disabled={updateStatus.isPending}
+                        >
+                          {t("Reject")}
+                        </Button>
+                        <Button
+                          className="w-full"
+                          onClick={() => {
+                            setAcceptingId(appt.id);
+                            setForm({ date: "", time: "", place: "" });
+                          }}
+                          disabled={updateStatus.isPending || acceptingId !== null}
+                        >
+                          {t("Accept")}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AdminLawyers() {
   const query = useListLawyers();
@@ -381,41 +5699,1287 @@ function AdminLawyers() {
   const t = useCopy();
   const [editing, setEditing] = useState<any>(null);
   const [verificationTarget, setVerificationTarget] = useState<any>(null);
-  const [verifyCode, setVerifyCode] = useState('');
-  const [verificationMessage, setVerificationMessage] = useState('');
-  const [form, setForm] = useState<any>({ name: '', email: '', sampleRegistrationNumber: '', verificationDocumentName: '', specialization: 'Property Law', location: '', languages: ['English'], experience: 3, availability: 'Available' });
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [form, setForm] = useState<any>({
+    name: "",
+    email: "",
+    sampleRegistrationNumber: "",
+    verificationDocumentName: "",
+    specialization: "Property Law",
+    location: "",
+    languages: ["English"],
+    experience: 3,
+    availability: "Available",
+  });
   const list: any[] = query.data || [];
   const open = (l?: any) => {
     setEditing(l || { id: 0 });
-    setForm(l ? { ...l, languages: l.languages } : { name: '', email: '', sampleRegistrationNumber: '', verificationDocumentName: '', specialization: 'Property Law', location: '', languages: ['English'], experience: 3, availability: 'Available' });
+    setForm(
+      l
+        ? { ...l, languages: l.languages }
+        : {
+            name: "",
+            email: "",
+            sampleRegistrationNumber: "",
+            verificationDocumentName: "",
+            specialization: "Property Law",
+            location: "",
+            languages: ["English"],
+            experience: 3,
+            availability: "Available",
+          },
+    );
   };
   const save = (e: any) => {
     e.preventDefault();
     const fn: any = editing?.id ? update : create;
-    fn.mutate({ ...(editing?.id ? { id: editing.id } : {}), data: { ...form, experience: Number(form.experience) } }, { onSuccess: () => { setEditing(null); queryClient.invalidateQueries({ queryKey: getListLawyersQueryKey() }); } });
+    fn.mutate(
+      {
+        ...(editing?.id ? { id: editing.id } : {}),
+        data: { ...form, experience: Number(form.experience) },
+      },
+      {
+        onSuccess: () => {
+          setEditing(null);
+          queryClient.invalidateQueries({ queryKey: getListLawyersQueryKey() });
+        },
+      },
+    );
   };
-  const startVerification = (l: any) => { setVerificationTarget(l); setVerifyCode(''); setVerificationMessage(''); };
-  const decide = (decision: 'verify' | 'reject') => {
+  const startVerification = (l: any) => {
+    setVerificationTarget(l);
+    setVerifyCode("");
+    setVerificationMessage("");
+  };
+  const decide = (decision: "verify" | "reject") => {
     if (!verificationTarget) return;
-    verify.mutate({ id: verificationTarget.id, data: { sampleRegistrationNumber: verifyCode, decision } as any }, {
-      onSuccess: (result: any) => { setVerificationMessage(result.message); queryClient.invalidateQueries({ queryKey: getListLawyersQueryKey() }); },
-      onError: (err: any) => setVerificationMessage(err?.message || t('Verification could not be completed.')),
-    });
+    verify.mutate(
+      {
+        id: verificationTarget.id,
+        data: { sampleRegistrationNumber: verifyCode, decision } as any,
+      },
+      {
+        onSuccess: (result: any) => {
+          setVerificationMessage(result.message);
+          queryClient.invalidateQueries({ queryKey: getListLawyersQueryKey() });
+        },
+        onError: (err: any) =>
+          setVerificationMessage(
+            err?.message || t("Verification could not be completed."),
+          ),
+      },
+    );
   };
-  const changeStatus = (l: any, status: string) => update.mutate({ id: l.id, data: { ...l, verificationStatus: status } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListLawyersQueryKey() }) });
-  return <><PageHead eyebrow="admin / directory" title="Lawyer profiles" description="Review applications, inspect fictional documents, verify council numbers, and manage directory access." action={<Button onClick={() => open()} data-testid="button-new-lawyer"><Plus size={16} />{t('Add lawyer')}</Button>} />
-    {editing && <Card className="mb-6 p-6"><form onSubmit={save} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label={t('Name')} value={form.name} onChange={(e: any) => setForm({ ...form, name: e.target.value })} required data-testid="input-lawyer-name" /><Field label={t('Email')} value={form.email || ''} onChange={(e: any) => setForm({ ...form, email: e.target.value })} data-testid="input-lawyer-email" /><Field label={t('Council / registration number')} value={form.sampleRegistrationNumber} onChange={(e: any) => setForm({ ...form, sampleRegistrationNumber: e.target.value })} required data-testid="input-lawyer-council-number" /><Field label={t('Dummy verification document')} value={form.verificationDocumentName || ''} onChange={(e: any) => setForm({ ...form, verificationDocumentName: e.target.value })} required data-testid="input-lawyer-document" /><Field label={t('Specialization')} value={form.specialization} onChange={(e: any) => setForm({ ...form, specialization: e.target.value })} required data-testid="input-lawyer-specialization" /><Field label={t('Location')} value={form.location} onChange={(e: any) => setForm({ ...form, location: e.target.value })} required data-testid="input-lawyer-location" /><Field label={t('Experience (years)')} type="number" value={form.experience} onChange={(e: any) => setForm({ ...form, experience: e.target.value })} data-testid="input-lawyer-experience" /><Field label={t('Availability')} value={form.availability} onChange={(e: any) => setForm({ ...form, availability: e.target.value })} data-testid="input-lawyer-availability" /><div className="flex items-end gap-2"><Button type="submit" data-testid="button-save-lawyer"><Check size={15} />{t('Save')}</Button><Button type="button" variant="quiet" onClick={() => setEditing(null)} data-testid="button-cancel-lawyer">{t('Cancel')}</Button></div></form></Card>}
-    {verificationTarget && <Card className="mb-6 border-accent/35 bg-[#e7f1eb] p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">{t('Review application')}</div><h2 className="jc-serif mt-2 text-2xl font-bold">{verificationTarget.name}</h2><p className="mt-1 text-sm text-muted-foreground">{verificationTarget.email || t('No email recorded')} · {verificationTarget.specialization} · {verificationTarget.location}</p></div><Button variant="quiet" onClick={() => setVerificationTarget(null)}>{t('Close')}</Button></div><div className="mt-5 grid gap-3 md:grid-cols-2"><div className="rounded-xl bg-card p-4 text-sm"><div className="font-bold">{t('Submitted details')}</div><div className="mt-2 grid gap-1 text-muted-foreground"><span>{t('Council / registration number')}: <b className="text-foreground">{verificationTarget.sampleRegistrationNumber || t('Not provided')}</b></span><span>{t('Dummy verification document')}: <b className="text-foreground">{verificationTarget.verificationDocumentName || t('Not provided')}</b></span></div></div><div className="grid gap-2"><Field label={t('Enter the council number to compare')} value={verifyCode} onChange={(e: any) => setVerifyCode(e.target.value)} placeholder="SAMPLE-REG-1001" data-testid="input-verify-council-number" /><div className="flex flex-wrap gap-2"><Button onClick={() => decide('verify')} disabled={!verifyCode.trim() || verify.isPending} data-testid="button-approve-lawyer"><Check size={15} />{t('Verify and approve')}</Button><Button variant="danger" onClick={() => decide('reject')} disabled={verify.isPending} data-testid="button-reject-lawyer"><X size={15} />{t('Reject application')}</Button></div></div></div>{verificationMessage && <div className="mt-4 rounded-xl bg-card px-4 py-3 text-sm font-bold text-primary" data-testid="status-lawyer-verification">{t(verificationMessage)}</div>}<p className="mt-4 text-xs leading-5 text-muted-foreground">{t('This is a fictional prototype review. It does not verify a real legal licence.')}</p></Card>}
-    <Card className="overflow-hidden"><div className="divide-y divide-border">{query.isLoading ? <Loading rows={4} /> : list.map(l => { const verified = l.verificationStatus === 'Verified Sample Lawyer'; return <div className="flex flex-wrap items-center gap-4 p-5" key={l.id}><div className="grid h-11 w-11 place-items-center rounded-xl bg-primary font-bold text-primary-foreground">{l.name.slice(0, 2).toUpperCase()}</div><div className="min-w-[220px] flex-1"><div className="flex items-center gap-2 font-bold text-primary">{l.name}{verified && <span className="grid h-5 w-5 place-items-center rounded-full bg-[#3e8b73] text-white" title={t('Verified Sample Lawyer')}><Check size={12} strokeWidth={3} /></span>}</div><div className="text-sm text-muted-foreground">{l.specialization} · {l.location}</div><div className="mt-1 text-xs text-muted-foreground">{t('Council / registration number')}: {l.sampleRegistrationNumber || t('Not provided')} · {t('Dummy verification document')}: {l.verificationDocumentName || t('Not provided')}</div></div><Badge tone={verified ? 'good' : l.verificationStatus === 'Suspended' || l.verificationStatus === 'Rejected' ? 'alert' : 'warn'}>{verified && <ShieldCheck size={12} />}{t(l.verificationStatus)}</Badge><div className="flex flex-wrap gap-1"><button onClick={() => open(l)} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary" data-testid={`button-edit-lawyer-${l.id}`}><Pencil size={15} /></button><Button variant="outline" className="min-h-8 px-3 text-xs" onClick={() => startVerification(l)} data-testid={`button-review-lawyer-${l.id}`}>{t('Review application')}</Button>{verified || l.verificationStatus === 'Suspended' ? <Button variant="outline" className="min-h-8 px-3 text-xs" onClick={() => changeStatus(l, l.verificationStatus === 'Suspended' ? 'Verified Sample Lawyer' : 'Suspended')} data-testid={`button-toggle-lawyer-${l.id}`}>{l.verificationStatus === 'Suspended' ? t('Reactivate lawyer') : t('Suspend access')}</Button> : null}</div></div>; })}</div></Card><PrototypeNote /></>;
+  const changeStatus = (l: any, status: string) =>
+    update.mutate(
+      { id: l.id, data: { ...l, verificationStatus: status } as any },
+      {
+        onSuccess: () =>
+          queryClient.invalidateQueries({ queryKey: getListLawyersQueryKey() }),
+      },
+    );
+  return (
+    <>
+      <PageHead
+        eyebrow="admin / directory"
+        title="Lawyer profiles"
+        description="Review applications, inspect fictional documents, verify council numbers, and manage directory access."
+        action={
+          <Button onClick={() => open()} data-testid="button-new-lawyer">
+            <Plus size={16} />
+            {t("Add lawyer")}
+          </Button>
+        }
+      />
+      {editing && (
+        <Card className="mb-6 p-6">
+          <form
+            onSubmit={save}
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <Field
+              label={t("Name")}
+              value={form.name}
+              onChange={(e: any) => setForm({ ...form, name: e.target.value })}
+              required
+              data-testid="input-lawyer-name"
+            />
+            <Field
+              label={t("Email")}
+              value={form.email || ""}
+              onChange={(e: any) => setForm({ ...form, email: e.target.value })}
+              data-testid="input-lawyer-email"
+            />
+            <Field
+              label={t("Council / registration number")}
+              value={form.sampleRegistrationNumber}
+              onChange={(e: any) =>
+                setForm({ ...form, sampleRegistrationNumber: e.target.value })
+              }
+              required
+              data-testid="input-lawyer-council-number"
+            />
+            <Field
+              label={t("Dummy verification document")}
+              value={form.verificationDocumentName || ""}
+              onChange={(e: any) =>
+                setForm({ ...form, verificationDocumentName: e.target.value })
+              }
+              required
+              data-testid="input-lawyer-document"
+            />
+            <Field
+              label={t("Specialization")}
+              value={form.specialization}
+              onChange={(e: any) =>
+                setForm({ ...form, specialization: e.target.value })
+              }
+              required
+              data-testid="input-lawyer-specialization"
+            />
+            <Field
+              label={t("Location")}
+              value={form.location}
+              onChange={(e: any) =>
+                setForm({ ...form, location: e.target.value })
+              }
+              required
+              data-testid="input-lawyer-location"
+            />
+            <Field
+              label={t("Experience (years)")}
+              type="number"
+              value={form.experience}
+              onChange={(e: any) =>
+                setForm({ ...form, experience: e.target.value })
+              }
+              data-testid="input-lawyer-experience"
+            />
+            <Field
+              label={t("Availability")}
+              value={form.availability}
+              onChange={(e: any) =>
+                setForm({ ...form, availability: e.target.value })
+              }
+              data-testid="input-lawyer-availability"
+            />
+            <div className="flex items-end gap-2">
+              <Button type="submit" data-testid="button-save-lawyer">
+                <Check size={15} />
+                {t("Save")}
+              </Button>
+              <Button
+                type="button"
+                variant="quiet"
+                onClick={() => setEditing(null)}
+                data-testid="button-cancel-lawyer"
+              >
+                {t("Cancel")}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+      {verificationTarget && (
+        <Card className="mb-6 border-accent/35 bg-[#e7f1eb] p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="jc-mono text-[10px] uppercase tracking-[.16em] text-[#3e8b73]">
+                {t("Review application")}
+              </div>
+              <h2 className="jc-serif mt-2 text-2xl font-bold">
+                {verificationTarget.name}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {verificationTarget.email || t("No email recorded")} ·{" "}
+                {verificationTarget.specialization} ·{" "}
+                {verificationTarget.location}
+              </p>
+            </div>
+            <Button variant="quiet" onClick={() => setVerificationTarget(null)}>
+              {t("Close")}
+            </Button>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl bg-card p-4 text-sm">
+              <div className="font-bold">{t("Submitted details")}</div>
+              <div className="mt-2 grid gap-1 text-muted-foreground">
+                <span>
+                  {t("Council / registration number")}:{" "}
+                  <b className="text-foreground">
+                    {verificationTarget.sampleRegistrationNumber ||
+                      t("Not provided")}
+                  </b>
+                </span>
+                <span>
+                  {t("Dummy verification document")}:{" "}
+                  <b className="text-foreground">
+                    {verificationTarget.verificationDocumentName ||
+                      t("Not provided")}
+                  </b>
+                </span>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Field
+                label={t("Enter the council number to compare")}
+                value={verifyCode}
+                onChange={(e: any) => setVerifyCode(e.target.value)}
+                placeholder="SAMPLE-REG-1001"
+                data-testid="input-verify-council-number"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => decide("verify")}
+                  disabled={!verifyCode.trim() || verify.isPending}
+                  data-testid="button-approve-lawyer"
+                >
+                  <Check size={15} />
+                  {t("Verify and approve")}
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => decide("reject")}
+                  disabled={verify.isPending}
+                  data-testid="button-reject-lawyer"
+                >
+                  <X size={15} />
+                  {t("Reject application")}
+                </Button>
+              </div>
+            </div>
+          </div>
+          {verificationMessage && (
+            <div
+              className="mt-4 rounded-xl bg-card px-4 py-3 text-sm font-bold text-primary"
+              data-testid="status-lawyer-verification"
+            >
+              {t(verificationMessage)}
+            </div>
+          )}
+          <p className="mt-4 text-xs leading-5 text-muted-foreground">
+            {t(
+              "This is a fictional prototype review. It does not verify a real legal licence.",
+            )}
+          </p>
+        </Card>
+      )}
+      <Card className="overflow-hidden">
+        <div className="divide-y divide-border">
+          {query.isLoading ? (
+            <Loading rows={4} />
+          ) : (
+            list.map((l) => {
+              const verified =
+                l.verificationStatus === "Verified Sample Lawyer";
+              return (
+                <div
+                  className="flex flex-wrap items-center gap-4 p-5"
+                  key={l.id}
+                >
+                  <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary font-bold text-primary-foreground">
+                    {l.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-[220px] flex-1">
+                    <div className="flex items-center gap-2 font-bold text-primary">
+                      {l.name}
+                      {verified && (
+                        <span
+                          className="grid h-5 w-5 place-items-center rounded-full bg-[#3e8b73] text-white"
+                          title={t("Verified Sample Lawyer")}
+                        >
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {l.specialization} · {l.location}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {t("Council / registration number")}:{" "}
+                      {l.sampleRegistrationNumber || t("Not provided")} ·{" "}
+                      {t("Dummy verification document")}:{" "}
+                      {l.verificationDocumentName || t("Not provided")}
+                    </div>
+                  </div>
+                  <Badge
+                    tone={
+                      verified
+                        ? "good"
+                        : l.verificationStatus === "Suspended" ||
+                            l.verificationStatus === "Rejected"
+                          ? "alert"
+                          : "warn"
+                    }
+                  >
+                    {verified && <ShieldCheck size={12} />}
+                    {t(l.verificationStatus)}
+                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <button
+                      onClick={() => open(l)}
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-secondary"
+                      data-testid={`button-edit-lawyer-${l.id}`}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <Button
+                      variant="outline"
+                      className="min-h-8 px-3 text-xs"
+                      onClick={() => startVerification(l)}
+                      data-testid={`button-review-lawyer-${l.id}`}
+                    >
+                      {t("Review application")}
+                    </Button>
+                    {verified || l.verificationStatus === "Suspended" ? (
+                      <Button
+                        variant="outline"
+                        className="min-h-8 px-3 text-xs"
+                        onClick={() =>
+                          changeStatus(
+                            l,
+                            l.verificationStatus === "Suspended"
+                              ? "Verified Sample Lawyer"
+                              : "Suspended",
+                          )
+                        }
+                        data-testid={`button-toggle-lawyer-${l.id}`}
+                      >
+                        {l.verificationStatus === "Suspended"
+                          ? t("Reactivate lawyer")
+                          : t("Suspend access")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </Card>
+      <PrototypeNote />
+    </>
+  );
 }
 
-function AdminCases() { const cases = useListCases(); const create = useCreateHearing(); const update = useUpdateHearing(); const [selected, setSelected] = useState<any>(null); const hearings = useListHearings(selected?.id || 0, { query: { enabled: Boolean(selected), queryKey: getListHearingsQueryKey(selected?.id || 0) } }); return <><PageHead eyebrow="admin / operations" title="Cases & hearings" description="Keep the public-facing timeline aligned with the records in the system." /><div className="grid gap-4">{(cases.data || []).map((c: any) => <Card key={c.id} className="p-5"><div className="flex flex-wrap items-center gap-4"><div className="grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary"><Gavel size={19} /></div><div className="min-w-[200px] flex-1"><div className="jc-mono text-[10px] text-muted-foreground">{c.caseNumber}</div><div className="mt-1 font-serif text-lg font-bold text-primary">{c.title}</div><div className="mt-1 text-sm text-muted-foreground">{c.court} · {c.location}</div></div><Badge tone={c.monitoringStatus === 'Needs Attention' ? 'warn' : 'good'}>{c.monitoringStatus}</Badge><Button variant="outline" className="min-h-9 px-3 text-xs" onClick={() => setSelected(selected?.id === c.id ? null : c)} data-testid={`button-hearings-${c.id}`}><CalendarDays size={14} />{selected?.id === c.id ? 'Close' : 'Hearings'}</Button></div>{selected?.id === c.id && <div className="mt-5 border-t border-border pt-4">{hearings.isLoading ? <Loading rows={2} /> : (hearings.data || []).map((h: any) => <div className="flex flex-wrap items-center gap-3 rounded-xl bg-secondary/40 p-3" key={h.id}><div className="jc-mono text-xs text-[#3e8b73]">{fmt(h.hearingDate)}</div><div className="flex-1 text-sm font-bold">{h.stage}</div><Badge>{h.result}</Badge><Button variant="quiet" className="min-h-8 px-2 text-xs" onClick={() => update.mutate({ id: h.id, data: { ...h, result: 'Completed' } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListHearingsQueryKey(c.id) }) })} data-testid={`button-complete-hearing-${h.id}`}>Mark complete</Button></div>)}<Button className="mt-3 min-h-9 px-3 text-xs" onClick={() => create.mutate({ id: c.id, data: { hearingDate: new Date().toISOString(), time: '11:00', stage: 'Administrative review', result: 'Scheduled' } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListHearingsQueryKey(c.id) }) })} data-testid={`button-add-admin-hearing-${c.id}`}><Plus size={14} />Add hearing</Button></div>}</Card>)}{cases.isLoading && <Loading rows={4} />}</div><PrototypeNote /></>; }
+function AdminCases() {
+  const cases = useListCases();
+  const create = useCreateHearing();
+  const update = useUpdateHearing();
+  const [selected, setSelected] = useState<any>(null);
+  const hearings = useListHearings(selected?.id || 0, {
+    query: {
+      enabled: Boolean(selected),
+      queryKey: getListHearingsQueryKey(selected?.id || 0),
+    },
+  });
+  return (
+    <>
+      <PageHead
+        eyebrow="admin / operations"
+        title="Cases & hearings"
+        description="Keep the public-facing timeline aligned with the records in the system."
+        action={
+          <div className="flex gap-2">
+            <Link href="/citizen/submit-case">
+              <Button data-testid="button-admin-create-case">
+                <Plus size={16} />
+                Create Case
+              </Button>
+            </Link>
+          </div>
+        }
+      />
+      <div className="grid gap-4">
+        {(cases.data || []).map((c: any) => (
+          <Card key={c.id} className="p-5">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="grid h-11 w-11 place-items-center rounded-xl bg-secondary text-primary">
+                <Gavel size={19} />
+              </div>
+              <div className="min-w-[200px] flex-1">
+                <div className="jc-mono text-[10px] text-muted-foreground">
+                  {c.caseNumber}
+                </div>
+                <div className="mt-1 font-serif text-lg font-bold text-primary">
+                  {c.title}
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {c.court} · {c.location}
+                </div>
+              </div>
+              <Badge
+                tone={
+                  c.monitoringStatus === "Needs Attention" ? "warn" : "good"
+                }
+              >
+                {c.monitoringStatus}
+              </Badge>
+              <Button
+                variant="outline"
+                className="min-h-9 px-3 text-xs"
+                onClick={() => setSelected(selected?.id === c.id ? null : c)}
+                data-testid={`button-hearings-${c.id}`}
+              >
+                <CalendarDays size={14} />
+                {selected?.id === c.id ? "Close" : "Hearings"}
+              </Button>
+            </div>
+            {selected?.id === c.id && (
+              <div className="mt-5 border-t border-border pt-4">
+                {hearings.isLoading ? (
+                  <Loading rows={2} />
+                ) : (
+                  (hearings.data || []).map((h: any) => (
+                    <div
+                      className="flex flex-wrap items-center gap-3 rounded-xl bg-secondary/40 p-3"
+                      key={h.id}
+                    >
+                      <div className="jc-mono text-xs text-[#3e8b73]">
+                        {fmt(h.hearingDate)}
+                      </div>
+                      <div className="flex-1 text-sm font-bold">{h.stage}</div>
+                      <Badge>{h.result}</Badge>
+                      <Button
+                        variant="quiet"
+                        className="min-h-8 px-2 text-xs"
+                        onClick={() =>
+                          update.mutate(
+                            {
+                              id: h.id,
+                              data: { ...h, result: "Completed" } as any,
+                            },
+                            {
+                              onSuccess: () =>
+                                queryClient.invalidateQueries({
+                                  queryKey: getListHearingsQueryKey(c.id),
+                                }),
+                            },
+                          )
+                        }
+                        data-testid={`button-complete-hearing-${h.id}`}
+                      >
+                        Mark complete
+                      </Button>
+                    </div>
+                  ))
+                )}
+                <Button
+                  className="mt-3 min-h-9 px-3 text-xs"
+                  onClick={() =>
+                    create.mutate(
+                      {
+                        id: c.id,
+                        data: {
+                          hearingDate: new Date().toISOString(),
+                          time: "11:00",
+                          stage: "Administrative review",
+                          result: "Scheduled",
+                        } as any,
+                      },
+                      {
+                        onSuccess: () =>
+                          queryClient.invalidateQueries({
+                            queryKey: getListHearingsQueryKey(c.id),
+                          }),
+                      },
+                    )
+                  }
+                  data-testid={`button-add-admin-hearing-${c.id}`}
+                >
+                  <Plus size={14} />
+                  Add hearing
+                </Button>
+              </div>
+            )}
+          </Card>
+        ))}
+        {cases.isLoading && <Loading rows={4} />}
+      </div>
+      <PrototypeNote />
+    </>
+  );
+}
 
-function AdminUpdates() { const list = useListNotifications(); const mark = useMarkNotificationRead(); const items: any[] = list.data || []; return <><PageHead eyebrow="admin / updates" title="Updates & notifications" description="A simple dispatch view for changes worth making visible." /><Card className="overflow-hidden">{list.isLoading ? <Loading rows={4} /> : items.length ? <div className="divide-y divide-border">{items.map(n => <div className="flex gap-4 p-5" key={n.id}><div className={cx('mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-xl', n.isRead ? 'bg-secondary text-muted-foreground' : 'bg-accent/25 text-primary')}><Bell size={17} /></div><div className="flex-1"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-bold text-primary">{n.title}</h3><span className="text-xs text-muted-foreground">{fmt(n.createdAt)}</span></div><p className="mt-1 text-sm leading-6 text-muted-foreground">{n.message}</p>{!n.isRead && <button onClick={() => mark.mutate({ id: n.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() }) })} className="mt-3 text-xs font-bold text-primary underline underline-offset-4" data-testid={`button-mark-read-${n.id}`}>Mark as read</button>}</div></div>)}</div> : <div className="p-5"><Empty icon={Bell} title="Nothing new" message="There are no updates waiting for review." /></div>}</Card><PrototypeNote /></>; }
+function AdminUpdates() {
+  const list = useListNotifications();
+  const mark = useMarkNotificationRead();
+  const items: any[] = list.data || [];
+  return (
+    <>
+      <PageHead
+        eyebrow="admin / updates"
+        title="Updates & notifications"
+        description="A simple dispatch view for changes worth making visible."
+      />
+      <Card className="overflow-hidden">
+        {list.isLoading ? (
+          <Loading rows={4} />
+        ) : items.length ? (
+          <div className="divide-y divide-border">
+            {items.map((n) => (
+              <div className="flex gap-4 p-5" key={n.id}>
+                <div
+                  className={cx(
+                    "mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+                    n.isRead
+                      ? "bg-secondary text-muted-foreground"
+                      : "bg-accent/25 text-primary",
+                  )}
+                >
+                  <Bell size={17} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <h3 className="font-bold text-primary">{n.title}</h3>
+                    <span className="text-xs text-muted-foreground">
+                      {fmt(n.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {n.message}
+                  </p>
+                  {!n.isRead && (
+                    <button
+                      onClick={() =>
+                        mark.mutate(
+                          { id: n.id },
+                          {
+                            onSuccess: () =>
+                              queryClient.invalidateQueries({
+                                queryKey: getListNotificationsQueryKey(),
+                              }),
+                          },
+                        )
+                      }
+                      className="mt-3 text-xs font-bold text-primary underline underline-offset-4"
+                      data-testid={`button-mark-read-${n.id}`}
+                    >
+                      Mark as read
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-5">
+            <Empty
+              icon={Bell}
+              title="Nothing new"
+              message="There are no updates waiting for review."
+            />
+          </div>
+        )}
+      </Card>
+      <PrototypeNote />
+    </>
+  );
+}
 
-function ProfilePage() { const me = useGetMe(); const lawyers = useListLawyers(); const lawyer = useGetLawyer(Number(me.data?.lawyerId || 0), { query: { enabled: Boolean(me.data?.lawyerId), queryKey: getGetLawyerQueryKey(Number(me.data?.lawyerId || 0)) } }); const update = useUpdateLawyer(); const t = useCopy(); const [saved, setSaved] = useState(false); const l: any = lawyer.data || lawyers.data?.[0]; const verified = l?.verificationStatus === 'Verified Sample Lawyer'; return <><PageHead eyebrow="lawyer / profile" title="Your profile" description="The public directory card is a small invitation to a useful first conversation." action={<Badge tone={verified ? 'good' : l?.verificationStatus === 'Suspended' || l?.verificationStatus === 'Rejected' ? 'alert' : 'warn'}>{verified && <ShieldCheck size={13} />}{t(l?.verificationStatus || 'Verification pending')}</Badge>} /><Card className="max-w-3xl p-6"><div className="flex items-center gap-4 border-b border-border pb-6"><div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary font-serif text-xl font-bold text-primary-foreground">{(l?.name || me.data?.name || 'LM').slice(0, 2).toUpperCase()}</div><div><h2 className="jc-serif text-2xl font-bold">{l?.name || me.data?.name || t('Lawyer profile')}</h2><p className="mt-1 text-sm text-muted-foreground">{l?.email || me.data?.email}</p></div></div>{l ? <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={e => { e.preventDefault(); update.mutate({ id: l.id, data: { ...l } as any }, { onSuccess: () => setSaved(true) }); }}><Field label={t('Specialization')} value={l.specialization} readOnly data-testid="input-profile-specialization" /><Field label={t('Location')} value={l.location} readOnly data-testid="input-profile-location" /><Field label={t('Languages')} value={l.languages?.join(', ')} readOnly data-testid="input-profile-languages" /><Field label={t('Availability')} value={l.availability} onChange={(e: any) => { l.availability = e.target.value; setSaved(false); }} data-testid="input-profile-availability" /><Field label={t('Council / registration number')} value={l.sampleRegistrationNumber || ''} readOnly data-testid="input-profile-council-number" /><Field label={t('Dummy verification document')} value={l.verificationDocumentName || ''} readOnly data-testid="input-profile-document" /><div className="sm:col-span-2 rounded-xl bg-secondary/60 p-4 text-sm leading-6 text-muted-foreground"><b className="text-foreground">{t('Application status')}: </b>{t(l.verificationStatus)}<br />{t('Your council number and document name are fictional prototype records reviewed by an administrator.')}</div><div className="sm:col-span-2 flex items-center gap-3"><Button type="submit" data-testid="button-save-profile"><Check size={15} />{t('Save profile')}</Button>{saved && <span className="text-sm font-bold text-[#3e8b73]" data-testid="status-profile-saved">{t('Saved just now')}</span>}</div></form> : <Loading rows={2} />}</Card><PrototypeNote /></>; }
+function ProfilePage() {
+  const me = useGetMe();
+  const lawyers = useListLawyers();
+  const lawyer = useGetLawyer(Number(me.data?.lawyerId || 0), {
+    query: {
+      enabled: Boolean(me.data?.lawyerId),
+      queryKey: getGetLawyerQueryKey(Number(me.data?.lawyerId || 0)),
+    },
+  });
+  const update = useUpdateLawyer();
+  const t = useCopy();
+  const [saved, setSaved] = useState(false);
+  const l: any = lawyer.data || lawyers.data?.[0];
+  const verified = l?.verificationStatus === "Verified Sample Lawyer";
+  return (
+    <>
+      <PageHead
+        eyebrow="lawyer / profile"
+        title="Your profile"
+        description="The public directory card is a small invitation to a useful first conversation."
+        action={
+          <Badge
+            tone={
+              verified
+                ? "good"
+                : l?.verificationStatus === "Suspended" ||
+                    l?.verificationStatus === "Rejected"
+                  ? "alert"
+                  : "warn"
+            }
+          >
+            {verified && <ShieldCheck size={13} />}
+            {t(l?.verificationStatus || "Verification pending")}
+          </Badge>
+        }
+      />
+      <Card className="max-w-3xl p-6">
+        <div className="flex items-center gap-4 border-b border-border pb-6">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary font-serif text-xl font-bold text-primary-foreground">
+            {(l?.name || me.data?.name || "LM").slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <h2 className="jc-serif text-2xl font-bold">
+              {l?.name || me.data?.name || t("Lawyer profile")}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {l?.email || me.data?.email}
+            </p>
+          </div>
+        </div>
+        {l ? (
+          <form
+            className="mt-6 grid gap-4 sm:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              update.mutate(
+                { id: l.id, data: { ...l } as any },
+                { onSuccess: () => setSaved(true) },
+              );
+            }}
+          >
+            <Field
+              label={t("Specialization")}
+              value={l.specialization}
+              onChange={(e: any) => { l.specialization = e.target.value; setSaved(false); }}
+              data-testid="input-profile-specialization"
+            />
+            <Field
+              label={t("Location")}
+              value={l.location}
+              onChange={(e: any) => { l.location = e.target.value; setSaved(false); }}
+              data-testid="input-profile-location"
+            />
+            <Field
+              label={t("Languages (comma separated)")}
+              value={l.languages?.join(", ")}
+              onChange={(e: any) => { l.languages = e.target.value.split(",").map((s: string) => s.trim()); setSaved(false); }}
+              data-testid="input-profile-languages"
+            />
+            <Field
+              label={t("Availability")}
+              value={l.availability}
+              onChange={(e: any) => {
+                l.availability = e.target.value;
+                setSaved(false);
+              }}
+              data-testid="input-profile-availability"
+            />
+            <Field
+              label={t("Council / registration number")}
+              value={l.sampleRegistrationNumber || ""}
+              readOnly
+              data-testid="input-profile-council-number"
+            />
+            <Field
+              label={t("Dummy verification document")}
+              value={l.verificationDocumentName || ""}
+              readOnly
+              data-testid="input-profile-document"
+            />
+            <div className="sm:col-span-2 rounded-xl bg-secondary/60 p-4 text-sm leading-6 text-muted-foreground">
+              <b className="text-foreground">{t("Application status")}: </b>
+              {t(l.verificationStatus)}
+              <br />
+              {t(
+                "Your council number and document name are fictional prototype records reviewed by an administrator.",
+              )}
+            </div>
+            <div className="sm:col-span-2 flex items-center gap-3">
+              <Button type="submit" data-testid="button-save-profile">
+                <Check size={15} />
+                {t("Save profile")}
+              </Button>
+              {saved && (
+                <span
+                  className="text-sm font-bold text-[#3e8b73]"
+                  data-testid="status-profile-saved"
+                >
+                  {t("Saved just now")}
+                </span>
+              )}
+            </div>
+          </form>
+        ) : (
+          <Loading rows={2} />
+        )}
+      </Card>
+      <PrototypeNote />
+    </>
+  );
+}
 
-function AppRouter() { return <Switch><Route path="/" component={Home} /><Route path="/sign-in"><Auth mode="sign-in" /></Route><Route path="/sign-up"><Auth mode="sign-up" /></Route><Route path="/citizen"><Protected role="citizen"><Dashboard role="citizen" /></Protected></Route><Route path="/citizen/cases"><Protected role="citizen"><CasesPage /></Protected></Route><Route path="/citizen/cases/:id"><Protected role="citizen"><CaseDetailPage /></Protected></Route><Route path="/citizen/documents"><Protected role="citizen"><DocumentsPage /></Protected></Route><Route path="/citizen/explainer"><Protected role="citizen"><ExplainerPage /></Protected></Route><Route path="/citizen/lawyers"><Protected role="citizen"><LawyersPage /></Protected></Route><Route path="/citizen/questions"><Protected role="citizen"><QuestionsPage /></Protected></Route><Route path="/citizen/complaints"><Protected role="citizen"><ComplaintsPage /></Protected></Route><Route path="/citizen/awareness"><Protected role="citizen"><AwarenessPage /></Protected></Route><Route path="/lawyer"><Protected role="lawyer"><Dashboard role="lawyer" /></Protected></Route><Route path="/lawyer/cases"><Protected role="lawyer"><CasesPage role="lawyer" /></Protected></Route><Route path="/lawyer/cases/:id"><Protected role="lawyer"><CaseDetailPage /></Protected></Route><Route path="/lawyer/questions"><Protected role="lawyer"><QuestionsPage lawyer /></Protected></Route><Route path="/lawyer/profile"><Protected role="lawyer"><ProfilePage /></Protected></Route><Route path="/admin"><Protected role="admin"><Dashboard role="admin" /></Protected></Route><Route path="/admin/users"><Protected role="admin"><UsersPage /></Protected></Route><Route path="/admin/lawyers"><Protected role="admin"><AdminLawyers /></Protected></Route><Route path="/admin/cases"><Protected role="admin"><AdminCases /></Protected></Route><Route path="/admin/cases/:id"><Protected role="admin"><CaseDetailPage /></Protected></Route><Route path="/admin/complaints"><Protected role="admin"><ComplaintsPage admin /></Protected></Route><Route path="/admin/awareness"><Protected role="admin"><AwarenessPage admin /></Protected></Route><Route path="/admin/updates"><Protected role="admin"><AdminUpdates /></Protected></Route><Route path="/admin/awareness/:id"><Protected role="admin"><AwarenessPage admin /></Protected></Route><Route component={NotFound} /></Switch>; }
-function RoutedErrorBoundary({ children }: { children: ReactNode }) { const [location] = useLocation(); return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><LanguageProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RoutedErrorBoundary><AppRouter /></RoutedErrorBoundary></WouterRouter><Toaster /></LanguageProvider></TooltipProvider></QueryClientProvider>; }
+function SubmitCasePage() {
+  const t = useCopy();
+  const createCase = useCreateCase();
+  const [form, setForm] = useState({
+    title: "",
+    category: "Consumer",
+    court: "",
+    location: "Chennai",
+    description: "",
+  });
+  const [error, setError] = useState("");
+  const [submittedCase, setSubmittedCase] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+
+  const categories = [
+    "Consumer",
+    "Civil",
+    "Property",
+    "Family",
+    "Labour & Employment",
+    "Public Service",
+    "General / Other",
+  ];
+
+  const update = (key: string, val: string) =>
+    setForm((prev) => ({ ...prev, [key]: val }));
+
+  const handleSubmit = (e: any) => {
+    e.preventDefault();
+    setError("");
+
+    if (form.title.trim().length < 3) {
+      setError(t("Case title must be at least 3 characters long."));
+      return;
+    }
+    if (form.description.trim().length < 10) {
+      setError(t("Description must be at least 10 characters long."));
+      return;
+    }
+
+    createCase.mutate(
+      {
+        data: {
+          title: form.title.trim(),
+          category: form.category.trim(),
+          description: form.description.trim(),
+          location: form.location.trim() || "To be assigned",
+          court: form.court.trim() || "Justice Connect Review Forum",
+        } as any,
+      },
+      {
+        onSuccess: (res: any) => {
+          setSubmittedCase(res);
+          queryClient.invalidateQueries({ queryKey: getListCasesQueryKey() });
+          queryClient.invalidateQueries({
+            queryKey: getGetDashboardSummaryQueryKey(),
+          });
+        },
+        onError: (err: any) => {
+          setError(
+            err?.message ||
+              t(
+                "Failed to submit case. Please check the details and try again.",
+              ),
+          );
+        },
+      },
+    );
+  };
+
+  const copyCaseNumber = () => {
+    if (!submittedCase?.caseNumber) return;
+    navigator.clipboard.writeText(submittedCase.caseNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  if (submittedCase) {
+    return (
+      <>
+        <div className="mx-auto max-w-3xl">
+          <div className="text-center">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#d9eee4] text-[#246047]">
+              <Check size={32} strokeWidth={3} />
+            </div>
+            <h1 className="jc-serif mt-5 text-4xl font-bold tracking-tight text-primary">
+              {t("Case successfully submitted!")}
+            </h1>
+            <p className="mt-2 text-base text-muted-foreground">
+              {t(
+                "Your case has been recorded in the Justice Connect database.",
+              )}
+            </p>
+          </div>
+
+          <Card className="mt-8 border-accent/40 bg-card p-6 shadow-md">
+            <div className="text-center">
+              <div className="jc-mono text-xs font-bold uppercase tracking-[.18em] text-muted-foreground">
+                {t("Justice Connect Case Number")}
+              </div>
+              <div
+                className="mt-2 font-mono text-3xl font-extrabold tracking-wide text-primary sm:text-4xl"
+                data-testid="text-submitted-case-number"
+              >
+                {submittedCase.caseNumber}
+              </div>
+              <div className="mt-3 flex justify-center">
+                <Button
+                  variant="outline"
+                  className="min-h-9 text-xs"
+                  onClick={copyCaseNumber}
+                  data-testid="button-copy-case-number"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={14} className="text-[#246047]" />{" "}
+                      {t("Copied to clipboard")}
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} /> {t("Copy reference number")}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-[#d4a64e]/50 bg-[#f7e7c2]/60 p-4 text-xs leading-5 text-[#795a17]">
+              <div className="flex items-start gap-2 font-bold text-sm">
+                <Info size={18} className="shrink-0 text-[#c38d3e]" />
+                <span>{t("Internal Reference Notice")}</span>
+              </div>
+              <p className="mt-1.5 pl-6">
+                {t(
+                  "This Justice Connect case number is an internal reference number for tracking within Justice Connect. It is NOT an official court case number and does not constitute a formal court filing.",
+                )}
+              </p>
+            </div>
+
+            <div className="mt-6 divide-y divide-border border-t border-border pt-4 text-sm">
+              <div className="flex justify-between py-2.5">
+                <span className="text-muted-foreground">{t("Case title")}</span>
+                <span className="font-bold text-primary">
+                  {submittedCase.title}
+                </span>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="text-muted-foreground">{t("Category")}</span>
+                <Badge tone="blue">{t(submittedCase.category)}</Badge>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="text-muted-foreground">{t("Status")}</span>
+                <Badge tone="good">{t(submittedCase.currentStatus)}</Badge>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="text-muted-foreground">
+                  {t("City or district")}
+                </span>
+                <span className="font-medium text-foreground">
+                  {submittedCase.location}
+                </span>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="text-muted-foreground">
+                  {t("Preferred forum or court (optional)")}
+                </span>
+                <span className="font-medium text-foreground">
+                  {submittedCase.court}
+                </span>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <span className="text-muted-foreground">
+                  {t("Filing date")}
+                </span>
+                <span className="font-mono text-foreground">
+                  {fmt(submittedCase.filingDate)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={`/citizen/cases/${submittedCase.id}`}
+                className="flex-1"
+              >
+                <Button
+                  className="w-full h-11"
+                  data-testid="button-view-submitted-case"
+                >
+                  {t("View case details")} <ArrowRight size={15} />
+                </Button>
+              </Link>
+              <Link href="/citizen" className="flex-1">
+                <Button
+                  variant="outline"
+                  className="w-full h-11"
+                  data-testid="button-return-dashboard"
+                >
+                  {t("Return to dashboard")}
+                </Button>
+              </Link>
+              <Button
+                variant="quiet"
+                className="h-11"
+                onClick={() => {
+                  setSubmittedCase(null);
+                  setForm({
+                    title: "",
+                    category: "Consumer",
+                    court: "",
+                    location: "Chennai",
+                    description: "",
+                  });
+                }}
+                data-testid="button-submit-another-case"
+              >
+                {t("Submit another case")}
+              </Button>
+            </div>
+          </Card>
+        </div>
+        <PrototypeNote />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4">
+        <Link
+          href="/citizen"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary"
+          data-testid="link-back-from-submission"
+        >
+          <ArrowLeft size={14} /> {t("Return to dashboard")}
+        </Link>
+      </div>
+
+      <PageHead
+        eyebrow="citizen / intake"
+        title={t("Submit a Case")}
+        description={t(
+          "Submit your case or complaint to receive a unique Justice Connect reference number for tracking.",
+        )}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
+        <Card className="p-6">
+          <div className="flex items-center gap-3 border-b border-border pb-4">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent/20 text-primary">
+              <Plus size={20} />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl font-bold text-primary">
+                {t("Case Information")}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {t("All information is validated and securely stored.")}
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
+            <label className="grid gap-1.5 text-sm font-semibold">
+              {t("Category")}
+              <select
+                value={form.category}
+                onChange={(e) => update("category", e.target.value)}
+                className="h-11 rounded-xl border border-input bg-background px-3 font-normal outline-none focus:border-accent"
+                data-testid="select-case-category"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {t(c)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <Field
+              label={t("Case title")}
+              value={form.title}
+              onChange={(e: any) => update("title", e.target.value)}
+              placeholder={t("e.g. Property boundary dispute with neighbor")}
+              required
+              minLength={3}
+              data-testid="input-case-title"
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label={t("City or district")}
+                value={form.location}
+                onChange={(e: any) => update("location", e.target.value)}
+                placeholder={t("e.g. Chennai")}
+                required
+                data-testid="input-case-location"
+              />
+              <Field
+                label={t("Preferred forum or court (optional)")}
+                value={form.court}
+                onChange={(e: any) => update("court", e.target.value)}
+                placeholder={t(
+                  "e.g. District Consumer Disputes Redressal Commission",
+                )}
+                data-testid="input-case-court"
+              />
+            </div>
+
+            <TextField
+              label={t("Detailed description")}
+              value={form.description}
+              onChange={(e: any) => update("description", e.target.value)}
+              placeholder={t(
+                "Explain the issue, relevant dates, parties involved, and what outcome you are seeking…",
+              )}
+              required
+              minLength={10}
+              rows={5}
+              data-testid="textarea-case-description"
+            />
+
+            {error && (
+              <div
+                className="rounded-xl bg-[#f8dbd4] px-4 py-3 text-sm text-[#8d372d]"
+                data-testid="status-case-error"
+              >
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="mt-2 h-12 w-full text-base font-bold"
+              disabled={createCase.isPending}
+              data-testid="button-submit-case-form"
+            >
+              {createCase.isPending ? (
+                <>{t("Submitting case…")}</>
+              ) : (
+                <>
+                  <Check size={18} /> {t("Submit case")}
+                </>
+              )}
+            </Button>
+          </form>
+        </Card>
+
+        <div className="grid content-start gap-5">
+          <Card className="border-accent/25 bg-[#e7f1eb] p-5">
+            <div className="flex items-center gap-2 font-bold text-sm text-primary">
+              <ShieldCheck size={18} className="text-[#3e8b73]" />
+              {t("Tips for a clear submission")}
+            </div>
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-primary/80">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3e8b73]" />
+                {t("State key facts with approximate dates")}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3e8b73]" />
+                {t("Mention all parties or authorities involved")}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3e8b73]" />
+                {t("Keep copies of relevant documents and notices")}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3e8b73]" />
+                {t("Do not include sensitive passwords or bank credentials")}
+              </li>
+            </ul>
+          </Card>
+
+          <Card className="border-[#d4a64e]/40 bg-[#f7e7c2]/50 p-5 text-xs leading-5 text-[#795a17]">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <AlertTriangle size={17} className="shrink-0" />
+              {t("Internal Reference Notice")}
+            </div>
+            <p className="mt-2">
+              {t(
+                "This Justice Connect case number is an internal reference number for tracking within Justice Connect. It is NOT an official court case number and does not constitute a formal court filing.",
+              )}
+            </p>
+          </Card>
+        </div>
+      </div>
+
+      <PrototypeNote />
+    </>
+  );
+}
+
+function AppRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={Home} />
+      <Route path="/sign-in">
+        <Auth mode="sign-in" />
+      </Route>
+      <Route path="/sign-up">
+        <Auth mode="sign-up" />
+      </Route>
+      <Route path="/citizen">
+        <Protected role="citizen">
+          <Dashboard role="citizen" />
+        </Protected>
+      </Route>
+      <Route path="/citizen/cases">
+        <Protected role="citizen">
+          <CasesPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/submit-case">
+        <Protected role="citizen">
+          <SubmitCasePage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/cases/:id">
+        <Protected role="citizen">
+          <CaseDetailPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/documents">
+        <Protected role="citizen">
+          <DocumentsPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/assistant">
+        <Protected role="citizen">
+          <GeneralAssistantPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/explainer">
+        <Protected role="citizen">
+          <ExplainerPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/lawyers">
+        <Protected role="citizen">
+          <LawyersPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/lawyers/:id">
+        <Protected role="citizen">
+          <LawyerDetailPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/appointments">
+        <Protected role="citizen">
+          <CitizenAppointments />
+        </Protected>
+      </Route>
+      <Route path="/citizen/questions">
+        <Protected role="citizen">
+          <QuestionsPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/complaints">
+        <Protected role="citizen">
+          <ComplaintsPage />
+        </Protected>
+      </Route>
+      <Route path="/citizen/awareness">
+        <Protected role="citizen">
+          <AwarenessPage />
+        </Protected>
+      </Route>
+      <Route path="/lawyer">
+        <Protected role="lawyer">
+          <Dashboard role="lawyer" />
+        </Protected>
+      </Route>
+      <Route path="/lawyer/cases">
+        <Protected role="lawyer">
+          <CasesPage role="lawyer" />
+        </Protected>
+      </Route>
+      <Route path="/lawyer/cases/:id">
+        <Protected role="lawyer">
+          <CaseDetailPage />
+        </Protected>
+      </Route>
+      <Route path="/lawyer/assistant">
+        <Protected role="lawyer">
+          <GeneralAssistantPage />
+        </Protected>
+      </Route>
+      <Route path="/lawyer/appointments">
+        <Protected role="lawyer">
+          <LawyerAppointments />
+        </Protected>
+      </Route>
+      <Route path="/lawyer/questions">
+        <Protected role="lawyer">
+          <QuestionsPage lawyer />
+        </Protected>
+      </Route>
+      <Route path="/lawyer/profile">
+        <Protected role="lawyer">
+          <ProfilePage />
+        </Protected>
+      </Route>
+      <Route path="/admin">
+        <Protected role="admin">
+          <Dashboard role="admin" />
+        </Protected>
+      </Route>
+      <Route path="/admin/users">
+        <Protected role="admin">
+          <UsersPage />
+        </Protected>
+      </Route>
+      <Route path="/admin/lawyers">
+        <Protected role="admin">
+          <AdminLawyers />
+        </Protected>
+      </Route>
+      <Route path="/admin/cases">
+        <Protected role="admin">
+          <AdminCases />
+        </Protected>
+      </Route>
+      <Route path="/admin/cases/:id">
+        <Protected role="admin">
+          <CaseDetailPage />
+        </Protected>
+      </Route>
+      <Route path="/admin/complaints">
+        <Protected role="admin">
+          <ComplaintsPage admin />
+        </Protected>
+      </Route>
+      <Route path="/admin/awareness">
+        <Protected role="admin">
+          <AwarenessPage admin />
+        </Protected>
+      </Route>
+      <Route path="/admin/updates">
+        <Protected role="admin">
+          <AdminUpdates />
+        </Protected>
+      </Route>
+      <Route path="/admin/awareness/:id">
+        <Protected role="admin">
+          <AwarenessPage admin />
+        </Protected>
+      </Route>
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+function RoutedErrorBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+}
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <LanguageProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <RoutedErrorBoundary>
+              <AppRouter />
+            </RoutedErrorBoundary>
+          </WouterRouter>
+          <Toaster />
+        </LanguageProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
 export default App;

@@ -32,6 +32,8 @@ export const UserLanguage = {
 
 export interface User {
   id: number;
+  /** @nullable */
+  justiceId?: string | null;
   name: string;
   email: string;
   role: UserRole;
@@ -88,16 +90,77 @@ export interface RegisterInput {
   availability?: string;
 }
 
+export type LoginInputRole = typeof LoginInputRole[keyof typeof LoginInputRole];
+
+
+export const LoginInputRole = {
+  citizen: 'citizen',
+  lawyer: 'lawyer',
+  admin: 'admin',
+} as const;
+
 export interface LoginInput {
   /** @minLength 1 */
   identifier: string;
   /** @minLength 8 */
   password: string;
+  role: LoginInputRole;
 }
 
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+export type AppointmentOrderStatus = typeof AppointmentOrderStatus[keyof typeof AppointmentOrderStatus];
+
+
+export const AppointmentOrderStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export interface AppointmentOrder {
+  id: number;
+  citizenId: number;
+  lawyerId: number;
+  /** @nullable */
+  caseId?: number | null;
+  /** @nullable */
+  caseNumber?: string | null;
+  caseType: string;
+  subject: string;
+  description: string;
+  status: AppointmentOrderStatus;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  scheduledPlace?: string;
+  createdAt: string;
+}
+
+export interface CreateAppointmentOrderBody {
+  lawyerId: number;
+  caseId?: number;
+  caseType: string;
+  subject: string;
+  description: string;
+}
+
+export type UpdateAppointmentOrderStatusBodyStatus = typeof UpdateAppointmentOrderStatusBodyStatus[keyof typeof UpdateAppointmentOrderStatusBodyStatus];
+
+
+export const UpdateAppointmentOrderStatusBodyStatus = {
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export interface UpdateAppointmentOrderStatusBody {
+  status: UpdateAppointmentOrderStatusBodyStatus;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  scheduledPlace?: string;
 }
 
 export interface DashboardSummary {
@@ -125,6 +188,9 @@ export interface Case {
   id: number;
   caseNumber: string;
   title: string;
+  category: string;
+  description: string;
+  requiredAction: string;
   /** @nullable */
   citizenName?: string | null;
   /** @nullable */
@@ -167,17 +233,29 @@ export type CaseDetail = Case & {
   documents: Document[];
 };
 
+export interface CaseMessage {
+  id: number;
+  caseId: number;
+  senderId: number;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CaseMessageInput {
+  content: string;
+}
+
 export interface CaseInput {
-  caseNumber: string;
+  /** @minLength 3 */
   title: string;
+  /** @minLength 2 */
+  category: string;
+  /** @minLength 10 */
+  description: string;
+  location?: string;
+  court?: string;
   citizenId?: number;
-  /** @nullable */
-  lawyerId?: number | null;
-  court: string;
-  location: string;
-  filingDate: string;
-  currentStatus: string;
-  monitoringStatus: MonitoringStatus;
 }
 
 export interface CaseUpdate {

@@ -5,10 +5,12 @@
  * Justice Connect academic prototype API
  * OpenAPI spec version: 0.1.0
  */
+import type { LoginInputRole } from './loginInputRole';
 
 export interface LoginInput {
   /** @minLength 1 */
   identifier: string;
   /** @minLength 8 */
   password: string;
+  role: LoginInputRole;
 }

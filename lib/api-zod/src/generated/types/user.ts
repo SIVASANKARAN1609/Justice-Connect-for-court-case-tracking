@@ -10,6 +10,8 @@ import type { UserRole } from './userRole';
 
 export interface User {
   id: number;
+  /** @nullable */
+  justiceId?: string | null;
   name: string;
   email: string;
   role: UserRole;

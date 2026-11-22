@@ -49,6 +49,7 @@ export const RegisterResponse = zod.object({
   "token": zod.string(),
   "user": zod.object({
   "id": zod.int(),
+  "justiceId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "role": zod.enum(['citizen', 'lawyer', 'admin']),
@@ -68,13 +69,15 @@ export const loginBodyPasswordMin = 8;
 
 export const LoginBody = zod.object({
   "identifier": zod.string().min(1),
-  "password": zod.string().min(loginBodyPasswordMin)
+  "password": zod.string().min(loginBodyPasswordMin),
+  "role": zod.enum(['citizen', 'lawyer', 'admin'])
 })
 
 export const LoginResponse = zod.object({
   "token": zod.string(),
   "user": zod.object({
   "id": zod.int(),
+  "justiceId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "role": zod.enum(['citizen', 'lawyer', 'admin']),
@@ -85,10 +88,91 @@ export const LoginResponse = zod.object({
 
 
 /**
+ * @summary List appointment orders (Citizen/Lawyer)
+ */
+export const ListAppointmentsResponseItem = zod.object({
+  "id": zod.int(),
+  "citizenId": zod.int(),
+  "lawyerId": zod.int(),
+  "caseId": zod.int().nullish(),
+  "caseNumber": zod.string().nullish(),
+  "caseType": zod.string(),
+  "subject": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED']),
+  "scheduledDate": zod.string().optional(),
+  "scheduledTime": zod.string().optional(),
+  "scheduledPlace": zod.string().optional(),
+  "createdAt": zod.string()
+})
+export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem)
+
+
+/**
+ * @summary Create an appointment order (Citizen)
+ */
+export const CreateAppointmentBody = zod.object({
+  "lawyerId": zod.int(),
+  "caseId": zod.int().optional(),
+  "caseType": zod.string(),
+  "subject": zod.string(),
+  "description": zod.string()
+})
+
+export const CreateAppointmentResponse = zod.object({
+  "id": zod.int(),
+  "citizenId": zod.int(),
+  "lawyerId": zod.int(),
+  "caseId": zod.int().nullish(),
+  "caseNumber": zod.string().nullish(),
+  "caseType": zod.string(),
+  "subject": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED']),
+  "scheduledDate": zod.string().optional(),
+  "scheduledTime": zod.string().optional(),
+  "scheduledPlace": zod.string().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Accept or reject an appointment (Lawyer)
+ */
+export const UpdateAppointmentStatusParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const UpdateAppointmentStatusBody = zod.object({
+  "status": zod.enum(['ACCEPTED', 'REJECTED']),
+  "scheduledDate": zod.string().optional(),
+  "scheduledTime": zod.string().optional(),
+  "scheduledPlace": zod.string().optional()
+})
+
+export const UpdateAppointmentStatusResponse = zod.object({
+  "id": zod.int(),
+  "citizenId": zod.int(),
+  "lawyerId": zod.int(),
+  "caseId": zod.int().nullish(),
+  "caseNumber": zod.string().nullish(),
+  "caseType": zod.string(),
+  "subject": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED']),
+  "scheduledDate": zod.string().optional(),
+  "scheduledTime": zod.string().optional(),
+  "scheduledPlace": zod.string().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Get the signed-in user
  */
 export const GetMeResponse = zod.object({
   "id": zod.int(),
+  "justiceId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "role": zod.enum(['citizen', 'lawyer', 'admin']),
@@ -166,6 +250,9 @@ export const ListCasesResponseItem = zod.object({
   "id": zod.int(),
   "caseNumber": zod.string(),
   "title": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "requiredAction": zod.string(),
   "citizenName": zod.string().nullish(),
   "lawyerName": zod.string().nullish(),
   "court": zod.string(),
@@ -180,24 +267,32 @@ export const ListCasesResponse = zod.array(ListCasesResponseItem)
 
 
 /**
- * @summary Add a sample case
+ * @summary Submit a Justice Connect case
  */
+export const createCaseBodyTitleMin = 3;
+
+export const createCaseBodyCategoryMin = 2;
+
+export const createCaseBodyDescriptionMin = 10;
+
+
+
 export const CreateCaseBody = zod.object({
-  "caseNumber": zod.string(),
-  "title": zod.string(),
-  "citizenId": zod.int().optional(),
-  "lawyerId": zod.int().nullish(),
-  "court": zod.string(),
-  "location": zod.string(),
-  "filingDate": zod.string(),
-  "currentStatus": zod.string(),
-  "monitoringStatus": zod.enum(['Normal Monitoring', 'Needs Attention', 'Long-Pending'])
+  "title": zod.string().min(createCaseBodyTitleMin),
+  "category": zod.string().min(createCaseBodyCategoryMin),
+  "description": zod.string().min(createCaseBodyDescriptionMin),
+  "location": zod.string().optional(),
+  "court": zod.string().optional(),
+  "citizenId": zod.int().optional()
 })
 
 export const CreateCaseResponse = zod.object({
   "id": zod.int(),
   "caseNumber": zod.string(),
   "title": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "requiredAction": zod.string(),
   "citizenName": zod.string().nullish(),
   "lawyerName": zod.string().nullish(),
   "court": zod.string(),
@@ -221,6 +316,9 @@ export const GetCaseResponse = zod.object({
   "id": zod.int(),
   "caseNumber": zod.string(),
   "title": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "requiredAction": zod.string(),
   "citizenName": zod.string().nullish(),
   "lawyerName": zod.string().nullish(),
   "court": zod.string(),
@@ -270,6 +368,9 @@ export const UpdateCaseResponse = zod.object({
   "id": zod.int(),
   "caseNumber": zod.string(),
   "title": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "requiredAction": zod.string(),
   "citizenName": zod.string().nullish(),
   "lawyerName": zod.string().nullish(),
   "court": zod.string(),
@@ -279,6 +380,45 @@ export const UpdateCaseResponse = zod.object({
   "monitoringStatus": zod.enum(['Normal Monitoring', 'Needs Attention', 'Long-Pending']),
   "caseAge": zod.string(),
   "nextHearing": zod.string().nullable()
+})
+
+
+/**
+ * @summary List messages for a case
+ */
+export const ListCaseMessagesParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ListCaseMessagesResponseItem = zod.object({
+  "id": zod.int(),
+  "caseId": zod.int(),
+  "senderId": zod.int(),
+  "senderName": zod.string(),
+  "content": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListCaseMessagesResponse = zod.array(ListCaseMessagesResponseItem)
+
+
+/**
+ * @summary Post a message to a case
+ */
+export const CreateCaseMessageParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CreateCaseMessageBody = zod.object({
+  "content": zod.string()
+})
+
+export const CreateCaseMessageResponse = zod.object({
+  "id": zod.int(),
+  "caseId": zod.int(),
+  "senderId": zod.int(),
+  "senderName": zod.string(),
+  "content": zod.string(),
+  "createdAt": zod.string()
 })
 
 

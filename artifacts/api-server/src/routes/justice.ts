@@ -1,10 +1,18 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
-import { and, asc, count, desc, eq, gte, ilike, or } from "drizzle-orm";
+import jwt from "jsonwebtoken";
+import multer from "multer";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const pdf = require("pdf-parse");
+import Tesseract from "tesseract.js";
+import { and, asc, count, desc, eq, gte, ilike, or, sql, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   awarenessArticlesTable,
   casesTable,
+  caseSequencesTable,
+  appointmentOrdersTable,
   complaintsTable,
   documentsTable,
   hearingsTable,
@@ -13,7 +21,9 @@ import {
   legalResponsesTable,
   notificationsTable,
   usersTable,
+  caseMessagesTable,
 } from "@workspace/db";
+import { chatSessionsTable, chatMessagesTable } from "@workspace/db/schema";
 import {
   AwarenessArticle,
   Case,
@@ -27,6 +37,8 @@ import {
 } from "@workspace/db";
 import {
   AuthResponse,
+  CreateAppointmentBody,
+  UpdateAppointmentStatusBody,
   CreateAwarenessBody,
   CreateAwarenessResponse,
   CreateCaseBody,
@@ -96,8 +108,16 @@ import {
   VerifyLawyerResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireRole, createToken } from "../middlewares/auth";
+import { saveDocument, getDocumentPath } from "../services/storage";
+import { askJusticeConnectAI } from "../services/ai";
+import { sendNotification } from "../services/notifications";
+import { DocumentAssistantBody, DocumentAssistantResponse, GeneralAssistantBody, GeneralAssistantResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+const upload = multer({
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 const ADMIN_LOGIN_ID = "JC-ADMIN-001";
 
 const nowIso = (value: Date | string | null | undefined) =>
@@ -110,10 +130,11 @@ const ageLabel = (filingDate: string) => {
 
 const publicUser = (user: User, lawyerId: string | null = null) => ({
   id: user.id,
+  justiceId: user.justiceId,
   name: user.name,
   email: user.email,
-  role: user.role,
-  language: user.language,
+  role: user.role as "citizen" | "lawyer" | "admin",
+  language: user.language as "English" | "Tamil",
   lawyerId,
 });
 
@@ -122,22 +143,33 @@ async function lawyerProfileForUser(userId: number) {
   return profile;
 }
 
-async function caseView(row: {
-  case: Case;
-  citizenName: string | null;
-  lawyerName: string | null;
-}) {
+async function mapCaseViews(rows: any[]) {
+  if (rows.length === 0) return [];
+  const caseIds = rows.map((r: any) => r.case.id);
   const today = new Date().toISOString().slice(0, 10);
-  const [hearing] = await db
+  const allHearings = await db
     .select()
     .from(hearingsTable)
-    .where(and(eq(hearingsTable.caseId, row.case.id), gte(hearingsTable.hearingDate, today)))
-    .orderBy(asc(hearingsTable.hearingDate))
-    .limit(1);
-  return {
+    .where(and(
+       inArray(hearingsTable.caseId, caseIds),
+       gte(hearingsTable.hearingDate, today)
+    ))
+    .orderBy(asc(hearingsTable.hearingDate));
+
+  const hearingMap = new Map<number, string>();
+  for (const h of allHearings) {
+    if (!hearingMap.has(h.caseId)) {
+      hearingMap.set(h.caseId, h.hearingDate);
+    }
+  }
+
+  return rows.map((row: any) => ({
     id: row.case.id,
-    caseNumber: row.case.caseNumber,
+    caseNumber: row.case.caseNumber ?? `JC-${new Date().getFullYear()}-${String(row.case.id).padStart(6, "0")}`,
     title: row.case.title,
+    category: row.case.category,
+    description: row.case.description,
+    requiredAction: row.case.requiredAction,
     citizenName: row.citizenName,
     lawyerName: row.lawyerName,
     court: row.case.court,
@@ -146,8 +178,17 @@ async function caseView(row: {
     currentStatus: row.case.currentStatus,
     monitoringStatus: row.case.monitoringStatus,
     caseAge: ageLabel(row.case.filingDate),
-    nextHearing: hearing?.hearingDate ?? null,
-  };
+    nextHearing: hearingMap.get(row.case.id) ?? null,
+  }));
+}
+
+async function caseViewSingle(row: {
+  case: Case;
+  citizenName: string | null;
+  lawyerName: string | null;
+}) {
+  const views = await mapCaseViews([row]);
+  return views[0];
 }
 
 function hearingView(hearing: Hearing, currentCase?: Case) {
@@ -157,8 +198,8 @@ function hearingView(hearing: Hearing, currentCase?: Case) {
     hearingDate: hearing.hearingDate,
     time: hearing.time,
     stage: hearing.stage,
-    court: currentCase?.court ?? "Sample Court",
-    location: currentCase?.location ?? "Sample location",
+    court: hearing.court || currentCase?.court || "Sample Court",
+    location: hearing.location || currentCase?.location || "Sample location",
     result: hearing.result,
     adjournmentReason: hearing.adjournmentReason,
   };
@@ -170,6 +211,9 @@ function documentView(document: Document) {
     caseId: document.caseId,
     fileName: document.fileName,
     fileType: document.fileType,
+    mimeType: document.mimeType,
+    fileSize: document.fileSize,
+    processingStatus: document.processingStatus,
     uploadedAt: nowIso(document.uploadedAt),
     explanation: document.explanation,
   };
@@ -219,6 +263,10 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  if ((parsed.data.role as string) === "admin") {
+    res.status(403).json({ error: "Cannot register as admin through public portal." });
+    return;
+  }
   const existing = await db.select().from(usersTable).where(eq(usersTable.email, parsed.data.email.toLowerCase()));
   if (existing.length > 0) {
     res.status(400).json({ error: "An account with that email already exists" });
@@ -228,34 +276,41 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Lawyer applications need a council/registration number and a verification document name" });
     return;
   }
+  let justiceId = "";
+  if (parsed.data.role === "citizen") {
+    justiceId = `JC-C-${String(Date.now()).slice(-6)}`;
+  } else if (parsed.data.role === "lawyer") {
+    justiceId = `JC-L-${String(Date.now()).slice(-6)}`;
+  }
+
   const [user] = await db.insert(usersTable).values({
+    justiceId,
     name: parsed.data.name,
     email: parsed.data.email.toLowerCase(),
     passwordHash: await bcrypt.hash(parsed.data.password, 10),
     role: parsed.data.role,
     language: parsed.data.language ?? "English",
   }).returning();
-  let lawyerId: string | null = null;
+
   if (parsed.data.role === "lawyer") {
-    lawyerId = `JC-LAW-${String(user.id).padStart(4, "0")}`;
     await db.insert(lawyersTable).values({
-      lawyerId,
+      lawyerId: justiceId,
       userId: user.id,
       name: user.name,
       email: user.email,
       sampleRegistrationNumber: parsed.data.sampleRegistrationNumber!.trim(),
-      verificationDocumentName: parsed.data.verificationDocumentName!.trim(),
-      specialization: "General Practice",
-      location: "To be added",
-      languages: [user.language],
-      experience: 0,
-      availability: "Available",
+      verificationDocumentName: parsed.data.verificationDocumentName?.trim() || "N/A",
+      specialization: parsed.data.specialization || "General Practice",
+      location: parsed.data.location || "To be added",
+      languages: parsed.data.languages && parsed.data.languages.length > 0 ? parsed.data.languages : [user.language],
+      experience: parsed.data.experience || 0,
+      availability: parsed.data.availability || "Available",
       verificationStatus: "Verification Required",
       isSample: false,
     });
   }
   const authUser = { id: user.id, name: user.name, email: user.email, role: parsed.data.role };
-  res.status(201).json(RegisterResponse.parse({ token: createToken(authUser), user: publicUser(user, lawyerId) }));
+  res.status(201).json(RegisterResponse.parse({ token: createToken(authUser), user: publicUser(user, parsed.data.role === "lawyer" ? justiceId : null) }));
 });
 
 router.post("/auth/login", async (req, res): Promise<void> => {
@@ -273,16 +328,88 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     .from(usersTable)
     .leftJoin(lawyersTable, eq(lawyersTable.userId, usersTable.id))
     .where(or(...identifierMatches));
-  if (!row || !row.user.active || !(await bcrypt.compare(parsed.data.password, row.user.passwordHash))) {
-    res.status(401).json({ error: "Invalid demo account details" });
+  if (!row) {
+    res.status(404).json({ error: "Account not found. Please create an account to continue." });
+    return;
+  }
+  if (!row.user.active || !(await bcrypt.compare(parsed.data.password, row.user.passwordHash))) {
+    res.status(401).json({ error: "Incorrect email or password. Please try again." });
     return;
   }
   const role = row.user.role as "citizen" | "lawyer" | "admin";
+  if (identifier.toUpperCase() !== ADMIN_LOGIN_ID && (parsed.data as any).role && role !== (parsed.data as any).role) {
+    res.status(403).json({ error: "This account is registered for a different role. Please select the correct portal." });
+    return;
+  }
   const authUser = { id: row.user.id, name: row.user.name, email: row.user.email, role };
   res.json(LoginResponse.parse({ token: createToken(authUser), user: publicUser(row.user, row.lawyerId) }));
 });
 
+const otpStore = new Map<string, { otp: string, expires: number }>();
+
+router.post("/auth/forgot-password/request", async (req, res): Promise<void> => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(ilike(usersTable.email, email.trim()));
+  if (!user) {
+    res.status(404).json({ error: "Account with that email not found" });
+    return;
+  }
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
+  otpStore.set(user.email.toLowerCase(), { otp, expires: Date.now() + 10 * 60000 });
+  console.log(`[MOCK EMAIL] To: ${user.email} -> Your password reset OTP is: ${otp}`);
+  res.json({ success: true, message: "OTP sent to your email.", mockOtp: otp });
+});
+
+router.post("/auth/forgot-password/verify", async (req, res): Promise<void> => {
+  const { email, otp } = req.body;
+  const record = otpStore.get(email.toLowerCase());
+  if (!record || record.otp !== otp || record.expires < Date.now()) {
+    res.status(400).json({ error: "Invalid or expired OTP" });
+    return;
+  }
+  res.json({ success: true, message: "OTP verified" });
+});
+
+router.post("/auth/forgot-password/reset", async (req, res): Promise<void> => {
+  const { email, otp, newPassword } = req.body;
+  const record = otpStore.get(email.toLowerCase());
+  if (!record || record.otp !== otp || record.expires < Date.now()) {
+    res.status(400).json({ error: "Invalid or expired OTP" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(ilike(usersTable.email, email.trim()));
+  if (!user) {
+    res.status(404).json({ error: "Account not found" });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, user.id));
+  otpStore.delete(user.email.toLowerCase());
+  res.json({ success: true, message: "Password reset successfully" });
+});
+
 router.use(requireAuth);
+
+router.post("/auth/change-password", async (req, res): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+  const user = req.authUser!;
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "Current and new password are required" });
+    return;
+  }
+  const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
+  if (!(await bcrypt.compare(currentPassword, dbUser.passwordHash))) {
+    res.status(400).json({ error: "Incorrect current password" });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, user.id));
+  res.json({ success: true, message: "Password changed successfully" });
+});
 
 router.get("/auth/me", async (req, res): Promise<void> => {
   const user = req.authUser!;
@@ -298,7 +425,7 @@ router.get("/auth/me", async (req, res): Promise<void> => {
 router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const user = req.authUser!;
   const cases = await visibleCases(user.id, user.role);
-  const caseViews = await Promise.all(cases.map(caseView));
+  const caseViews = await mapCaseViews(cases);
   const questions = user.role === "lawyer"
     ? await db.select().from(legalQuestionsTable).where(eq(legalQuestionsTable.status, "Pending"))
     : await db.select().from(legalQuestionsTable).where(eq(legalQuestionsTable.citizenId, user.id));
@@ -372,18 +499,101 @@ router.get("/cases", async (req, res): Promise<void> => {
     const statusMatch = parsed.data.monitoringStatus ? row.case.monitoringStatus === parsed.data.monitoringStatus : true;
     return searchMatch && statusMatch;
   });
-  res.json(ListCasesResponse.parse(await Promise.all(filtered.map(caseView))));
+  res.json(ListCasesResponse.parse(await mapCaseViews(filtered)));
 });
 
-router.post("/cases", requireRole("admin"), async (req, res): Promise<void> => {
+async function generateUniqueJcNumber(tx: any): Promise<string> {
+  const currentYear = new Date().getFullYear();
+
+  // Ensure case_sequences table exists in PostgreSQL
+  await tx.execute(sql`
+    CREATE TABLE IF NOT EXISTS case_sequences (
+      year integer PRIMARY KEY,
+      last_number integer NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Find max existing number for the current year in casesTable to prevent collision with seed or existing data
+  const maxExistingResult = await tx.execute(sql`
+    SELECT MAX(
+      NULLIF(
+        regexp_replace(case_number, '^JC-' || ${currentYear} || '-([0-9]+)$', '\\1'),
+        case_number
+      )::integer
+    ) as max_num
+    FROM cases
+    WHERE case_number LIKE ${'JC-' + currentYear + '-%'}
+  `);
+
+  const rawMax = maxExistingResult.rows?.[0]?.max_num;
+  const startingNum = (rawMax != null && !isNaN(Number(rawMax))) ? Number(rawMax) : 0;
+
+  // Atomic PostgreSQL upsert with row-level lock:
+  // Multiple concurrent citizen submissions are serialized by Postgres row-level lock on case_sequences.
+  // Each transaction receives a strictly unique, incrementing sequence number.
+  const seqResult = await tx.execute(sql`
+    INSERT INTO case_sequences (year, last_number)
+    VALUES (${currentYear}, ${startingNum + 1})
+    ON CONFLICT (year) DO UPDATE
+    SET last_number = GREATEST(case_sequences.last_number, ${startingNum}) + 1
+    RETURNING last_number
+  `);
+
+  const nextNumber = Number(seqResult.rows[0].last_number);
+  return `JC-${currentYear}-${String(nextNumber).padStart(6, "0")}`;
+}
+
+async function allocateNextCaseNumber() {
+  return db.transaction(async (tx) => generateUniqueJcNumber(tx));
+}
+
+router.post("/cases", requireRole("citizen", "admin"), async (req, res): Promise<void> => {
   const parsed = CreateCaseBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [created] = await db.insert(casesTable).values(parsed.data).returning();
+  const actor = req.authUser!;
+  // Strictly enforce citizenId: citizens cannot spoof another citizen's ID
+  const citizenId = actor.role === "citizen" ? actor.id : parsed.data.citizenId ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const courtName = (parsed.data as any).court?.trim() || "Justice Connect Review Forum";
+  const locationName = parsed.data.location?.trim() || "To be assigned";
+
+  const created = await db.transaction(async (tx) => {
+    // Automatically generate unique JC case number: JC-{YEAR}-{6 DIGITS}
+    const caseNumber = await generateUniqueJcNumber(tx);
+
+    const [saved] = await tx.insert(casesTable).values({
+      caseNumber,
+      title: parsed.data.title.trim(),
+      category: parsed.data.category.trim(),
+      description: parsed.data.description.trim(),
+      requiredAction: "We will review your submission and contact you if more information is needed.",
+      citizenId,
+      lawyerId: null,
+      court: courtName,
+      location: locationName,
+      filingDate: today,
+      currentStatus: "Submitted",
+      monitoringStatus: "Normal Monitoring",
+    }).returning();
+
+    if (citizenId) {
+      // We do not wait for email sending in the transaction
+      sendNotification(
+        citizenId,
+        "Case submitted",
+        "case_submitted",
+        `Your Justice Connect case ${caseNumber} was submitted successfully. Note: This is an internal Justice Connect reference number, not an official court case number.`,
+        actor.email
+      ).catch(console.error);
+    }
+    return saved;
+  });
+
   const [row] = (await caseRows()).filter((item) => item.case.id === created.id);
-  res.status(201).json(CreateCaseResponse.parse(await caseView(row)));
+  res.status(201).json(CreateCaseResponse.parse(await caseViewSingle(row)));
 });
 
 router.get("/cases/:id", async (req, res): Promise<void> => {
@@ -403,7 +613,7 @@ router.get("/cases/:id", async (req, res): Promise<void> => {
     db.select().from(documentsTable).where(eq(documentsTable.caseId, row.case.id)).orderBy(desc(documentsTable.uploadedAt)),
   ]);
   res.json(GetCaseResponse.parse({
-    ...(await caseView(row)),
+    ...(await caseViewSingle(row)),
     hearings: hearings.map((hearing) => hearingView(hearing, row.case)),
     documents: documents.map(documentView),
   }));
@@ -416,13 +626,30 @@ router.put("/cases/:id", requireRole("admin"), async (req, res): Promise<void> =
     res.status(400).json({ error: "Invalid case update" });
     return;
   }
+  const [existingCase] = await db.select().from(casesTable).where(eq(casesTable.id, params.data.id));
+  if (!existingCase) {
+    res.status(404).json({ error: "Case not found" });
+    return;
+  }
   const [updated] = await db.update(casesTable).set(parsed.data).where(eq(casesTable.id, params.data.id)).returning();
+
+  if (existingCase.currentStatus !== updated.currentStatus) {
+    if (updated.citizenId) {
+      await db.insert(notificationsTable).values({ userId: updated.citizenId, title: "Case Status Updated", type: "case_update", message: `Your case ${updated.caseNumber || ''} status was updated to ${updated.currentStatus}.` });
+    }
+    if (updated.lawyerId) {
+      const [lawyer] = await db.select().from(lawyersTable).where(eq(lawyersTable.id, updated.lawyerId));
+      if (lawyer && lawyer.userId) {
+        await db.insert(notificationsTable).values({ userId: lawyer.userId, title: "Case Status Updated", type: "case_update", message: `Case ${updated.caseNumber || ''} status was updated to ${updated.currentStatus}.` });
+      }
+    }
+  }
   if (!updated) {
     res.status(404).json({ error: "Case not found" });
     return;
   }
   const [row] = (await caseRows()).filter((item) => item.case.id === updated.id);
-  res.json(UpdateCaseResponse.parse(await caseView(row)));
+  res.json(UpdateCaseResponse.parse(await caseViewSingle(row)));
 });
 
 router.get("/cases/:id/hearings", async (req, res): Promise<void> => {
@@ -448,8 +675,25 @@ router.post("/cases/:id/hearings", requireRole("admin"), async (req, res): Promi
     res.status(400).json({ error: "Invalid hearing" });
     return;
   }
-  const [created] = await db.insert(hearingsTable).values({ ...parsed.data, caseId: params.data.id }).returning();
+  const rawBody = req.body as any;
+  const court = rawBody.court;
+  const location = rawBody.location;
+
+  const [created] = await db.insert(hearingsTable).values({ ...parsed.data, court, location, caseId: params.data.id }).returning();
   const [currentCase] = await db.select().from(casesTable).where(eq(casesTable.id, params.data.id));
+
+  if (currentCase) {
+    if (currentCase.citizenId) {
+      await db.insert(notificationsTable).values({ userId: currentCase.citizenId, title: "New Hearing Scheduled", type: "hearing_update", message: `A new hearing was scheduled for case ${currentCase.caseNumber || ''} on ${created.hearingDate}.` });
+    }
+    if (currentCase.lawyerId) {
+      const [lawyer] = await db.select().from(lawyersTable).where(eq(lawyersTable.id, currentCase.lawyerId));
+      if (lawyer && lawyer.userId) {
+         await db.insert(notificationsTable).values({ userId: lawyer.userId, title: "New Hearing Scheduled", type: "hearing_update", message: `A new hearing was scheduled for case ${currentCase.caseNumber || ''} on ${created.hearingDate}.` });
+      }
+    }
+  }
+
   res.status(201).json(CreateHearingResponse.parse(hearingView(created, currentCase)));
 });
 
@@ -460,12 +704,26 @@ router.put("/hearings/:id", requireRole("admin"), async (req, res): Promise<void
     res.status(400).json({ error: "Invalid hearing update" });
     return;
   }
-  const [updated] = await db.update(hearingsTable).set(parsed.data).where(eq(hearingsTable.id, params.data.id)).returning();
-  if (!updated) {
+  const [existingHearing] = await db.select().from(hearingsTable).where(eq(hearingsTable.id, params.data.id));
+  if (!existingHearing) {
     res.status(404).json({ error: "Hearing not found" });
     return;
   }
+
+  const [updated] = await db.update(hearingsTable).set(parsed.data).where(eq(hearingsTable.id, params.data.id)).returning();
   const [currentCase] = await db.select().from(casesTable).where(eq(casesTable.id, updated.caseId));
+
+  if (currentCase && (existingHearing.hearingDate !== updated.hearingDate || existingHearing.stage !== updated.stage)) {
+    if (currentCase.citizenId) {
+      await db.insert(notificationsTable).values({ userId: currentCase.citizenId, title: "Hearing Updated", type: "hearing_update", message: `The hearing for case ${currentCase.caseNumber || ''} was updated to ${updated.hearingDate}.` });
+    }
+    if (currentCase.lawyerId) {
+      const [lawyer] = await db.select().from(lawyersTable).where(eq(lawyersTable.id, currentCase.lawyerId));
+      if (lawyer && lawyer.userId) {
+         await db.insert(notificationsTable).values({ userId: lawyer.userId, title: "Hearing Updated", type: "hearing_update", message: `The hearing for case ${currentCase.caseNumber || ''} was updated to ${updated.hearingDate}.` });
+      }
+    }
+  }
   res.json(UpdateHearingResponse.parse(hearingView(updated, currentCase)));
 });
 
@@ -484,19 +742,174 @@ router.get("/cases/:id/documents", async (req, res): Promise<void> => {
   res.json(ListDocumentsResponse.parse(documents.map(documentView)));
 });
 
-router.post("/documents", async (req, res): Promise<void> => {
-  const parsed = CreateDocumentBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+router.post("/cases/:id/documents/upload", requireRole("citizen"), upload.single("file"), async (req, res): Promise<void> => {
+  const params = GetCaseParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
     return;
   }
+
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+
   const rows = await visibleCases(req.authUser!.id, req.authUser!.role);
-  if (!rows.some((row) => row.case.id === parsed.data.caseId)) {
+  if (!rows.some((row) => row.case.id === params.data.id)) {
     res.status(404).json({ error: "Case not found" });
     return;
   }
-  const [created] = await db.insert(documentsTable).values({ ...parsed.data, uploadedBy: req.authUser!.id }).returning();
-  res.status(201).json(CreateDocumentResponse.parse(documentView(created)));
+
+  const storedFileName = await saveDocument(file.originalname, file.buffer);
+
+  let extractedText: string | null = null;
+  let processingStatus = "PROCESSED";
+
+  if (file.mimetype === "application/pdf") {
+    try {
+      const data = await pdf(file.buffer);
+      extractedText = data.text;
+    } catch (e) {
+      processingStatus = "FAILED";
+    }
+  } else if (file.mimetype.startsWith("image/")) {
+    processingStatus = "PROCESSING";
+    try {
+      // For images, we can do OCR
+      const result = await Tesseract.recognize(file.buffer, "eng");
+      extractedText = result.data.text;
+      processingStatus = "PROCESSED";
+    } catch (e) {
+      console.error("OCR Error:", e);
+      processingStatus = "FAILED";
+      extractedText = "OCR processing failed.";
+    }
+  } else {
+    processingStatus = "PROCESSED";
+    extractedText = "Text extraction not supported for this format.";
+  }
+
+  const [created] = await db.insert(documentsTable).values({
+    caseId: params.data.id,
+    uploadedBy: req.authUser!.id,
+    fileName: file.originalname,
+    storedFileName,
+    fileType: file.mimetype.includes("pdf") ? "PDF" : "Image",
+    mimeType: file.mimetype,
+    fileSize: file.size,
+    extractedText,
+    processingStatus,
+  }).returning();
+
+  sendNotification(
+    req.authUser!.id,
+    "Document Processed",
+    "document_processed",
+    `Your document ${file.originalname} has been uploaded and processed.`,
+    req.authUser!.email
+  ).catch(console.error);
+
+  res.status(201).json(documentView(created));
+});
+
+router.post("/ai/chat", requireRole("citizen", "lawyer", "admin"), async (req, res): Promise<void> => {
+  const { message, caseId, documentId, inlineData } = req.body;
+  let { sessionId } = req.body;
+
+  if (typeof message !== "string" || message.trim() === "") {
+    res.status(400).json({ error: "Message is required" });
+    return;
+  }
+
+  const user = req.authUser!;
+
+  try {
+    // 1. Session Management
+    if (!sessionId) {
+      const [newSession] = await db.insert(chatSessionsTable).values({
+        userId: user.id,
+        title: message.substring(0, 50),
+      }).returning();
+      sessionId = newSession.id;
+    }
+
+    // 2. Fetch history
+    const history = await db.select().from(chatMessagesTable)
+      .where(eq(chatMessagesTable.sessionId, sessionId))
+      .orderBy(asc(chatMessagesTable.createdAt));
+
+    // Save user message
+    await db.insert(chatMessagesTable).values({
+      sessionId,
+      role: "user",
+      content: message,
+    });
+
+    // 3. Build Context
+    const context: any = {
+      userRole: user.role,
+      userName: user.name,
+    };
+
+    // RBAC & Context Data
+    const visibleUserCases = await visibleCases(user.id, user.role);
+
+    if (documentId) {
+      const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, documentId));
+      if (!doc || !visibleUserCases.some((row) => row.case.id === doc.caseId)) {
+        res.status(403).json({ error: "Unauthorized access to document" });
+        return;
+      }
+      context.documentText = doc.extractedText;
+    }
+
+    if (caseId) {
+      const caseRow = visibleUserCases.find((row) => row.case.id === caseId);
+      if (!caseRow) {
+        res.status(403).json({ error: "Unauthorized access to case" });
+        return;
+      }
+      const hearings = await db.select().from(hearingsTable).where(eq(hearingsTable.caseId, caseId));
+      context.caseContext = { ...caseRow.case, hearings };
+    } else if (user.role === "citizen") {
+      // If no specific case requested but is a citizen, attach their cases overview
+      context.userCases = visibleUserCases.map((row) => row.case);
+    }
+
+    // If asking about lawyers, pass verified lawyers context
+    if (message.toLowerCase().includes("lawyer")) {
+      const verifiedLawyers = await db.select().from(lawyersTable).where(eq(lawyersTable.verificationStatus, "Verified Sample Lawyer"));
+      context.lawyerContext = verifiedLawyers.map(l => ({ name: l.name, specialization: l.specialization, location: l.location, languages: l.languages }));
+    }
+
+    if (inlineData) {
+      context.multimodalFile = inlineData;
+    }
+
+    // 4. Call AI
+    const answer = await askJusticeConnectAI(message, history as any, context);
+
+    // Save assistant message
+    await db.insert(chatMessagesTable).values({
+      sessionId,
+      role: "assistant",
+      content: answer,
+    });
+
+    res.json({
+      answer,
+      sessionId,
+      disclaimer: "Justice Connect provides general educational information only and does not replace professional legal advice."
+    });
+  } catch (error: any) {
+    if (error.message === "OPENAI_API_KEY_MISSING") {
+      res.status(503).json({ error: "AI Assistant is not configured yet (Missing OPENAI_API_KEY)." });
+    } else {
+      console.error(error);
+      res.status(500).json({ error: "There was an error communicating with the AI service. Please try again later." });
+    }
+  }
 });
 
 router.get("/lawyers", async (req, res): Promise<void> => {
@@ -505,10 +918,32 @@ router.get("/lawyers", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const lawyers = await db.select().from(lawyersTable).orderBy(asc(lawyersTable.name));
-  const filtered = lawyers.filter((lawyer) => {
+
+  // Extract token to check if user is admin
+  let isAdmin = false;
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.slice(7);
+      const secret = process.env.SESSION_SECRET ?? "justice-connect-academic-development-secret";
+      const claims = jwt.verify(token, secret) as any;
+      if (claims.role === "admin") {
+        isAdmin = true;
+      }
+    } catch (e) {
+      // ignore invalid token for this public route
+    }
+  }
+
+  let query: any = db.select().from(lawyersTable);
+  if (!isAdmin) {
+    query = query.where(eq(lawyersTable.verificationStatus, "Verified Sample Lawyer"));
+  }
+  const lawyers = await query.orderBy(asc(lawyersTable.name));
+  console.log(`[DEBUG] GET /lawyers - Found ${lawyers.length} lawyers from DB for isAdmin=${isAdmin}`);
+  const filtered = lawyers.filter((lawyer: any) => {
     const locationMatch = parsed.data.location ? lawyer.location.toLowerCase().includes(parsed.data.location.toLowerCase()) : true;
-    const languageMatch = parsed.data.language ? lawyer.languages.some((item) => item.toLowerCase() === parsed.data.language?.toLowerCase()) : true;
+    const languageMatch = parsed.data.language ? (lawyer.languages as string[]).some((item: string) => item.toLowerCase() === parsed.data.language?.toLowerCase()) : true;
     const specializationMatch = parsed.data.specialization ? lawyer.specialization.toLowerCase().includes(parsed.data.specialization.toLowerCase()) : true;
     const availabilityMatch = parsed.data.availability ? lawyer.availability === parsed.data.availability : true;
     return locationMatch && languageMatch && specializationMatch && availabilityMatch;
@@ -546,6 +981,13 @@ router.get("/lawyers/:id", async (req, res): Promise<void> => {
   if (!lawyer) {
     res.status(404).json({ error: "Lawyer not found" });
     return;
+  }
+  if (req.authUser!.role !== "admin" && !lawyer.verificationStatus.startsWith("Verified")) {
+    const myProfile = await lawyerProfileForUser(req.authUser!.id);
+    if (!myProfile || myProfile.id !== lawyer.id) {
+      res.status(403).json({ error: "Access denied. Lawyer is not verified." });
+      return;
+    }
   }
   res.json(GetLawyerResponse.parse(lawyerView(lawyer)));
 });
@@ -807,6 +1249,276 @@ router.put("/notifications/:id/read", async (req, res): Promise<void> => {
     isRead: updated.isRead,
     createdAt: nowIso(updated.createdAt),
   }));
+});
+
+// --- Appointments ---
+router.get("/appointments", requireRole("citizen", "lawyer"), async (req, res): Promise<void> => {
+  const user = req.authUser!;
+  let condition;
+  if (user.role === "citizen") {
+    condition = eq(appointmentOrdersTable.citizenId, user.id);
+  } else if (user.role === "lawyer") {
+    const profile = await lawyerProfileForUser(user.id);
+    if (!profile) {
+      res.json([]);
+      return;
+    }
+    condition = eq(appointmentOrdersTable.lawyerId, profile.id);
+  } else {
+    res.status(403).json({ error: "Unauthorized role" });
+    return;
+  }
+
+  const orders = await db
+    .select({
+      id: appointmentOrdersTable.id,
+      citizenId: appointmentOrdersTable.citizenId,
+      lawyerId: appointmentOrdersTable.lawyerId,
+      caseId: appointmentOrdersTable.caseId,
+      caseNumber: casesTable.caseNumber,
+      caseType: appointmentOrdersTable.caseType,
+      subject: appointmentOrdersTable.subject,
+      description: appointmentOrdersTable.description,
+      status: appointmentOrdersTable.status,
+      scheduledDate: appointmentOrdersTable.scheduledDate,
+      scheduledTime: appointmentOrdersTable.scheduledTime,
+      scheduledPlace: appointmentOrdersTable.scheduledPlace,
+      createdAt: appointmentOrdersTable.createdAt
+    })
+    .from(appointmentOrdersTable)
+    .leftJoin(casesTable, eq(appointmentOrdersTable.caseId, casesTable.id))
+    .where(condition)
+    .orderBy(desc(appointmentOrdersTable.createdAt));
+  res.json(orders);
+});
+
+router.post("/appointments", requireRole("citizen"), async (req, res): Promise<void> => {
+  const parsed = CreateAppointmentBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const user = req.authUser!;
+
+  const [order] = await db.insert(appointmentOrdersTable).values({
+    citizenId: user.id,
+    lawyerId: parsed.data.lawyerId,
+    caseId: parsed.data.caseId,
+    caseType: parsed.data.caseType,
+    subject: parsed.data.subject,
+    description: parsed.data.description,
+    status: "PENDING"
+  }).returning();
+
+  res.status(201).json(order);
+});
+
+router.post("/appointments/:id/status", requireRole("lawyer"), async (req, res): Promise<void> => {
+  const parsed = UpdateAppointmentStatusBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const id = Number(req.params["id"]);
+  if (Number.isNaN(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid ID format" });
+    return;
+  }
+
+  const user = req.authUser!;
+  const [order] = await db.select().from(appointmentOrdersTable).where(eq(appointmentOrdersTable.id, id));
+
+  const profile = await lawyerProfileForUser(user.id);
+  if (!order || !profile || order.lawyerId !== profile.id) {
+    res.status(404).json({ error: "Appointment order not found or not assigned to you" });
+    return;
+  }
+
+  if (order.status === parsed.data.status) {
+    res.json(order);
+    return;
+  }
+
+  const [updatedOrder] = await db.update(appointmentOrdersTable)
+    .set({
+      status: parsed.data.status,
+      scheduledDate: parsed.data.scheduledDate ?? null,
+      scheduledTime: parsed.data.scheduledTime ?? null,
+      scheduledPlace: parsed.data.scheduledPlace ?? null
+    })
+    .where(eq(appointmentOrdersTable.id, id))
+    .returning();
+
+  const [lawyer] = await db.select().from(lawyersTable).where(eq(lawyersTable.userId, user.id));
+
+  if (parsed.data.status === "ACCEPTED") {
+    if (order.caseId) {
+      // Assign lawyer to existing case instead of creating duplicate
+      await db.update(casesTable)
+        .set({ lawyerId: lawyer?.id ?? null })
+        .where(eq(casesTable.id, order.caseId));
+    } else {
+      // Generate new case
+      const caseNumber = await allocateNextCaseNumber();
+      await db.insert(casesTable).values({
+        caseNumber,
+        title: order.subject,
+        category: order.caseType,
+        description: order.description,
+        citizenId: order.citizenId,
+        lawyerId: lawyer?.id ?? null,
+        court: "Unassigned",
+        location: lawyer?.location || "Unknown",
+        filingDate: new Date().toISOString().split("T")[0],
+        currentStatus: "Under Review",
+        monitoringStatus: "Normal Monitoring"
+      });
+    }
+    await db.insert(notificationsTable).values({
+      userId: order.citizenId,
+      title: "Request Accepted",
+      type: "appointment_update",
+      message: `Your legal help request has been ACCEPTED by ${lawyer?.name || 'the lawyer'}.`,
+    });
+  } else if (parsed.data.status === "REJECTED") {
+    if (order.caseId && lawyer) {
+      const [relatedCase] = await db.select().from(casesTable).where(eq(casesTable.id, order.caseId));
+      if (relatedCase && relatedCase.lawyerId === lawyer.id) {
+        await db.update(casesTable).set({ lawyerId: null }).where(eq(casesTable.id, order.caseId));
+      }
+    }
+    await db.insert(notificationsTable).values({
+      userId: order.citizenId,
+      title: "Request Rejected",
+      type: "appointment_update",
+      message: `Your legal help request was REJECTED by ${lawyer?.name || 'the lawyer'}.`,
+    });
+  }
+
+  res.json(updatedOrder);
+});
+
+router.put("/lawyers/:id", requireRole("lawyer", "admin"), async (req, res): Promise<void> => {
+  const id = Number(req.params["id"]);
+  if (Number.isNaN(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid ID format" });
+    return;
+  }
+  const body = req.body as any;
+  const updateData = {
+    specialization: body.specialization,
+    location: body.location,
+    languages: body.languages,
+    availability: body.availability,
+  };
+
+  const [updated] = await db.update(lawyersTable)
+    .set(updateData)
+    .where(eq(lawyersTable.id, id))
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Lawyer not found" });
+    return;
+  }
+  res.json(updated);
+});
+
+// --- Case Messages ---
+router.get("/cases/:id/messages", requireRole("citizen", "lawyer"), async (req, res): Promise<void> => {
+  const caseId = Number(req.params["id"]);
+  if (Number.isNaN(caseId) || caseId <= 0) {
+    res.status(400).json({ error: "Invalid ID format" });
+    return;
+  }
+  const user = req.authUser!;
+  const [caseItem] = await db.select().from(casesTable).where(eq(casesTable.id, caseId));
+  if (!caseItem) {
+    res.status(404).json({ error: "Case not found" });
+    return;
+  }
+
+  if (user.role === "citizen" && caseItem.citizenId !== user.id) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  if (user.role === "lawyer") {
+    const [lawyer] = await db.select().from(lawyersTable).where(eq(lawyersTable.userId, user.id));
+    if (!lawyer || caseItem.lawyerId !== lawyer.id) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+  }
+
+  const messages = await db
+    .select({
+      id: caseMessagesTable.id,
+      caseId: caseMessagesTable.caseId,
+      senderId: caseMessagesTable.senderId,
+      senderName: usersTable.name,
+      content: caseMessagesTable.content,
+      createdAt: caseMessagesTable.createdAt
+    })
+    .from(caseMessagesTable)
+    .innerJoin(usersTable, eq(caseMessagesTable.senderId, usersTable.id))
+    .where(eq(caseMessagesTable.caseId, caseId))
+    .orderBy(asc(caseMessagesTable.createdAt));
+
+  // Format dates for response
+  const formatted = messages.map(m => ({
+    ...m,
+    createdAt: nowIso(m.createdAt)
+  }));
+
+  res.json(formatted);
+});
+
+router.post("/cases/:id/messages", requireRole("citizen", "lawyer"), async (req, res): Promise<void> => {
+  const caseId = Number(req.params["id"]);
+  if (Number.isNaN(caseId) || caseId <= 0) {
+    res.status(400).json({ error: "Invalid ID format" });
+    return;
+  }
+
+  const content = req.body?.content;
+  if (!content || typeof content !== "string") {
+    res.status(400).json({ error: "Content is required" });
+    return;
+  }
+
+  const user = req.authUser!;
+  const [caseItem] = await db.select().from(casesTable).where(eq(casesTable.id, caseId));
+  if (!caseItem) {
+    res.status(404).json({ error: "Case not found" });
+    return;
+  }
+
+  if (user.role === "citizen" && caseItem.citizenId !== user.id) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  if (user.role === "lawyer") {
+    const [lawyer] = await db.select().from(lawyersTable).where(eq(lawyersTable.userId, user.id));
+    if (!lawyer || caseItem.lawyerId !== lawyer.id) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+  }
+
+  const [created] = await db.insert(caseMessagesTable).values({
+    caseId,
+    senderId: user.id,
+    content
+  }).returning();
+
+  res.status(201).json({
+    ...created,
+    senderName: user.name,
+    createdAt: nowIso(created.createdAt)
+  });
 });
 
 export default router;

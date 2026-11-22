@@ -47,3 +47,22 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.env
+.env.*
+# Temporary database and admin scripts
+artifacts/api-server/fix.mjs
+artifacts/api-server/hash-admin.mjs
+lib/db/check-admins.mjs
+lib/db/fix-db-pg.cjs
+lib/db/fix.mjs
+lib/db/seed-lawyers.mjs
+check-users.mjs
+fix-db-status.ts
+fix.mjs
+fix.ts
+test-admin-lawyers.mjs
+test-citizen-lawyers.mjs
+test-workflow.mjs
+
+# Accidental terminal output file
+tatus --short
